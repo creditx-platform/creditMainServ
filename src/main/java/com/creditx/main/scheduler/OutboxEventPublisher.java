@@ -7,8 +7,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.creditx.main.model.OutboxEvent;
-import com.creditx.main.service.KafkaPublisher;
 import com.creditx.main.service.OutboxEventService;
+import com.creditx.main.service.OutboxStreamPublisher;
 
 import lombok.RequiredArgsConstructor;
 
@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class OutboxEventPublisher {
     private final OutboxEventService outboxEventService;
-    private final KafkaPublisher kafkaPublisher;
+    private final OutboxStreamPublisher outboxStreamPublisher;
 
     @Value("${app.outbox.batch-size}")
     private int batchSize;
@@ -27,7 +27,7 @@ public class OutboxEventPublisher {
 
         for (OutboxEvent event : events) {
             try {
-                kafkaPublisher.send(event.getAggregateId().toString(), event.getPayload());
+                outboxStreamPublisher.publish(event.getAggregateId().toString(), event.getPayload());
                 outboxEventService.markAsPublished(event);
             } catch (Exception e) {
                 outboxEventService.markAsFailed(event);

@@ -11,9 +11,9 @@
             "description": "Outbox publish interval"
         },
         {
-            "name": "app.kafka.topic",
+            "name": "app.outbox.binding",
             "type": "java.lang.String",
-            "description": "Kafka topic name"
+            "description": "Kafka topic name abstracted as Outbox binding name"
         }
     ]
 }
