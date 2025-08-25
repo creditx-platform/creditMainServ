@@ -1,5 +1,8 @@
 package com.creditx.main.model;
 
-public class TransactionStatus {
-    
+public enum TransactionStatus {
+    INITIATED,
+    AUTHORIZED,
+    REJECTED,
+    COMPLETED    
 }

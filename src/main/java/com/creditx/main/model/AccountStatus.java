@@ -1,5 +1,7 @@
 package com.creditx.main.model;
 
-public class AccountStatus {
-    
+public enum AccountStatus {
+    ACTIVE,
+    BLOCKED,
+    CLOSED
 }
