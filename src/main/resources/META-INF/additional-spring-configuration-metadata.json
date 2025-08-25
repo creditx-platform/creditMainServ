@@ -1,0 +1,19 @@
+{
+    "properties": [
+        {
+            "name": "app.outbox.batch-size",
+            "type": "java.lang.String",
+            "description": "Outbox batch size"
+        },
+        {
+            "name": "app.outbox.publish-interval",
+            "type": "java.lang.String",
+            "description": "Outbox publish interval"
+        },
+        {
+            "name": "app.kafka.topic",
+            "type": "java.lang.String",
+            "description": "Kafka topic name"
+        }
+    ]
+}

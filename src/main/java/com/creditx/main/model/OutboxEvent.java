@@ -1,6 +1,7 @@
 package com.creditx.main.model;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -44,7 +45,7 @@ public class OutboxEvent {
     private String status;
 
     @Column(name = "CREATED_AT", nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    private final LocalDateTime createdAt = LocalDateTime.now();
 
     @Column(name = "PUBLISHED_AT")
     private Instant publishedAt;

@@ -26,7 +26,6 @@ public class OutboxEventServiceImpl implements OutboxEventService {
                 .aggregateId(aggregateId)
                 .payload(payload)
                 .status("PENDING")
-                .createdAt(Instant.now())
                 .build();
         return repository.save(event);
     }

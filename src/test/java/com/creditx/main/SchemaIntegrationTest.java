@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 })
 public class SchemaIntegrationTest {
 
+    @SuppressWarnings("resource")
     @Container
     static final OracleContainer oracle = new OracleContainer("gvenzl/oracle-xe:21-slim-faststart")
             .withUsername("testuser")

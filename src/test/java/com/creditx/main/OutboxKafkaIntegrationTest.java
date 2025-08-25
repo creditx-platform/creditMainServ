@@ -22,7 +22,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,6 +35,7 @@ import java.util.Map;
 })
 class OutboxKafkaIntegrationTest {
 
+    @SuppressWarnings("resource")
     @Container
     static final OracleContainer oracle = new OracleContainer("gvenzl/oracle-xe:21-slim-faststart")
             .withUsername("testuser")
@@ -85,7 +85,6 @@ class OutboxKafkaIntegrationTest {
                 .aggregateId(123L)
                 .payload("{\"transactionId\":\"txn-123\",\"amount\":100.50}")
                 .status("PENDING")
-                .createdAt(Instant.now())
                 .build();
 
         OutboxEvent savedEvent = outboxEventRepository.save(outboxEvent);
