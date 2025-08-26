@@ -2,7 +2,7 @@ package com.creditx.main;
 
 import com.creditx.main.model.OutboxEvent;
 import com.creditx.main.repository.OutboxEventRepository;
-import com.creditx.main.scheduler.OutboxEventPublisher;
+import com.creditx.main.scheduler.OutboxEventPublishingScheduler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -44,7 +44,7 @@ public class OutboxStreamIntegrationTest {
     private OutboxEventRepository outboxEventRepository;
 
     @Autowired
-    private OutboxEventPublisher outboxEventPublisher;
+    private OutboxEventPublishingScheduler outboxEventPublisher;
 
     @Autowired
     private OutputDestination outputDestination;

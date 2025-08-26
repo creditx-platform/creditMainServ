@@ -1,5 +1,9 @@
 package com.creditx.main.repository;
 
-public class TransactionRepository {
-    
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.creditx.main.model.Transaction;
+
+public interface TransactionRepository extends JpaRepository<Transaction, Long> {
+
 }

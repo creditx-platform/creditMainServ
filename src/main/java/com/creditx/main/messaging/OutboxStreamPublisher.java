@@ -1,4 +1,4 @@
-package com.creditx.main.service;
+package com.creditx.main.messaging;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.stream.function.StreamBridge;

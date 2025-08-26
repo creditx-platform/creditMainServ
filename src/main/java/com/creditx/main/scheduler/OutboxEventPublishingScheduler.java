@@ -6,15 +6,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import com.creditx.main.messaging.OutboxStreamPublisher;
 import com.creditx.main.model.OutboxEvent;
 import com.creditx.main.service.OutboxEventService;
-import com.creditx.main.service.OutboxStreamPublisher;
 
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-public class OutboxEventPublisher {
+public class OutboxEventPublishingScheduler {
     private final OutboxEventService outboxEventService;
     private final OutboxStreamPublisher outboxStreamPublisher;
 
