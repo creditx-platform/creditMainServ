@@ -7,9 +7,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
-import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.oracle.OracleContainer;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -23,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 public class SchemaIntegrationTest {
 
     @Container
-    static final OracleContainer oracle = new OracleContainer("gvenzl/oracle-xe:21-slim-faststart")
+    static final OracleContainer oracle = new OracleContainer("gvenzl/oracle-free:latest-faststart")
             .withUsername("testuser")
             .withPassword("testpassword");
 
