@@ -3,6 +3,8 @@ package com.creditx.main.model;
 import java.time.Instant;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.persistence.Id;
 import jakarta.persistence.Column;
@@ -40,8 +42,9 @@ public class OutboxEvent {
     @Column(name = "PAYLOAD", nullable = false)
     private String payload;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "STATUS", nullable = false)
-    private String status;
+    private OutboxEventStatus status;
 
     @Column(name = "CREATED_AT", nullable = false, updatable = false)
     @Builder.Default

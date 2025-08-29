@@ -1,6 +1,7 @@
 package com.creditx.main;
 
 import com.creditx.main.model.OutboxEvent;
+import com.creditx.main.model.OutboxEventStatus;
 import com.creditx.main.repository.OutboxEventRepository;
 import com.creditx.main.scheduler.OutboxEventPublishingScheduler;
 import org.junit.jupiter.api.Test;
@@ -56,7 +57,7 @@ public class OutboxStreamIntegrationTest {
                 .eventType("TRANSACTION_CREATED")
                 .aggregateId(123L)
                 .payload("{\"transactionId\":\"txn-123\",\"amount\":100.50}")
-                .status("PENDING")
+                .status(OutboxEventStatus.PENDING)
                 .build();
 
         OutboxEvent savedEvent = outboxEventRepository.save(outboxEvent);
@@ -79,14 +80,14 @@ public class OutboxStreamIntegrationTest {
                 .eventType("TRANSACTION_CREATED")
                 .aggregateId(100L)
                 .payload("{\"transactionId\":\"txn-100\",\"amount\":50.00}")
-                .status("PENDING")
+                .status(OutboxEventStatus.PENDING)
                 .build();
 
         OutboxEvent event2 = OutboxEvent.builder()
                 .eventType("TRANSACTION_UPDATED")
                 .aggregateId(200L)
                 .payload("{\"transactionId\":\"txn-200\",\"amount\":75.00}")
-                .status("PENDING")
+                .status(OutboxEventStatus.PENDING)
                 .build();
 
         outboxEventRepository.save(event1);

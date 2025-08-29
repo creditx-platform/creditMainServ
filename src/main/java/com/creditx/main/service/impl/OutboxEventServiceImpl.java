@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.creditx.main.model.OutboxEvent;
+import com.creditx.main.model.OutboxEventStatus;
 import com.creditx.main.repository.OutboxEventRepository;
 import com.creditx.main.service.OutboxEventService;
 
@@ -25,7 +26,7 @@ public class OutboxEventServiceImpl implements OutboxEventService {
                 .eventType(eventType)
                 .aggregateId(aggregateId)
                 .payload(payload)
-                .status("PENDING")
+                .status(OutboxEventStatus.PENDING)
                 .build();
         return repository.save(event);
     }
@@ -34,7 +35,7 @@ public class OutboxEventServiceImpl implements OutboxEventService {
     public List<OutboxEvent> fetchPendingEvents(int limit) {
         return repository.findAll()
                 .stream()
-                .filter(e -> "PENDING".equals(e.getStatus()))
+                .filter(e -> OutboxEventStatus.PENDING.equals(e.getStatus()))
                 .limit(limit)
                 .toList();
     }
@@ -42,7 +43,7 @@ public class OutboxEventServiceImpl implements OutboxEventService {
     @Override
     @Transactional
     public void markAsPublished(OutboxEvent event) {
-        event.setStatus("PUBLISHED");
+        event.setStatus(OutboxEventStatus.PUBLISHED);
         event.setPublishedAt(Instant.now());
         repository.save(event);
     }
@@ -50,7 +51,7 @@ public class OutboxEventServiceImpl implements OutboxEventService {
     @Override
     @Transactional
     public void markAsFailed(OutboxEvent event) {
-        event.setStatus("FAILED");
+        event.setStatus(OutboxEventStatus.FAILED);
         repository.save(event);
     }
 }
