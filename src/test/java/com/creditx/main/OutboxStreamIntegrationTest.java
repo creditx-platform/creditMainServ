@@ -15,9 +15,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.oracle.OracleContainer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,7 +29,7 @@ public class OutboxStreamIntegrationTest {
 
     @SuppressWarnings("resource")
     @Container
-    static final OracleContainer oracle = new OracleContainer("gvenzl/oracle-xe:21-slim-faststart")
+    static final OracleContainer oracle = new OracleContainer("gvenzl/oracle-free:latest-faststart")
             .withUsername("testuser")
             .withPassword("testpass");
 
