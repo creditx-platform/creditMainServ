@@ -62,12 +62,12 @@ public class OutboxStreamIntegrationTest {
 
         OutboxEvent savedEvent = outboxEventRepository.save(outboxEvent);
         assertThat(savedEvent.getEventId()).isNotNull();
-    assertThat(savedEvent.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
+        assertThat(savedEvent.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
 
         outboxEventPublisher.publishPendingEvents();
 
         OutboxEvent updatedEvent = outboxEventRepository.findById(savedEvent.getEventId()).orElseThrow();
-    assertThat(updatedEvent.getStatus()).isEqualTo(OutboxEventStatus.PUBLISHED);
+        assertThat(updatedEvent.getStatus()).isEqualTo(OutboxEventStatus.PUBLISHED);
         assertThat(updatedEvent.getPublishedAt()).isNotNull();
 
         assertStreamMessageReceived("{\"transactionId\":\"txn-123\",\"amount\":100.50}");
