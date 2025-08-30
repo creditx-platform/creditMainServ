@@ -35,6 +35,10 @@ public class Account {
     private Long customerId;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "ACCOUNT_TYPE", nullable = false, length = 20)
+    private AccountType type;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "STATUS", nullable = false, length = 20)
     private AccountStatus status;
 
