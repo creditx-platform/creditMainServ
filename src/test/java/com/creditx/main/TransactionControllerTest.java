@@ -1,0 +1,46 @@
+package com.creditx.main;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import com.creditx.main.controller.TransactionController;
+import com.creditx.main.dto.CreateTransactionResponse;
+import com.creditx.main.model.TransactionStatus;
+import com.creditx.main.service.TransactionService;
+
+import static org.mockito.BDDMockito.given;
+
+@WebMvcTest(controllers = TransactionController.class)
+class TransactionControllerTest {
+
+        @Autowired
+        MockMvc mockMvc;
+
+        @MockBean
+        TransactionService transactionService;
+
+        @Test
+        void createTransaction_success() throws Exception {
+                given(transactionService.createInboundTransaction(any())).willReturn(
+                                CreateTransactionResponse.builder().transactionId(999L).status(TransactionStatus.PENDING).build());
+
+                String body = "{\"issuerAccountId\":1,\"merchantAccountId\":2,\"amount\":100.00,\"currency\":\"USD\"}";
+
+                mockMvc.perform(post("/transactions")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                                .andExpect(status().isAccepted())
+                                .andExpect(jsonPath("$.transactionId").value(999))
+                                .andExpect(jsonPath("$.status").value("PENDING"));
+        }
+}
+
