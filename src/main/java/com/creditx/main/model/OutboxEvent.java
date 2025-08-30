@@ -18,21 +18,20 @@ import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "MAIN_OUTBOX_EVENTS")
+@Table(name = "CMS_OUTBOX_EVENTS")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-
 public class OutboxEvent {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "outbox_seq_gen")
-    @SequenceGenerator(name = "outbox_seq_gen", sequenceName = "MAIN_OUTBOX_SEQ", allocationSize = 1)
+    @SequenceGenerator(name = "outbox_seq_gen", sequenceName = "CMS_OUTBOX_SEQ", allocationSize = 1)
     @Column(name = "EVENT_ID")
     private Long eventId;
 
-    @Column(name = "EVENT_TYPE", nullable = false)
+    @Column(name = "EVENT_TYPE", nullable = false, length = 100)
     private String eventType;
 
     @Column(name = "AGGREGATE_ID")
@@ -43,12 +42,11 @@ public class OutboxEvent {
     private String payload;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "STATUS", nullable = false)
+    @Column(name = "STATUS", nullable = false, length = 20)
     private OutboxEventStatus status;
 
-    @Column(name = "CREATED_AT", nullable = false, updatable = false)
-    @Builder.Default
-    private Instant createdAt = Instant.now();
+    @Column(name = "CREATED_AT", insertable = false, updatable = false)
+    private Instant createdAt;
 
     @Column(name = "PUBLISHED_AT")
     private Instant publishedAt;
