@@ -14,6 +14,11 @@
             "name": "app.outbox.binding",
             "type": "java.lang.String",
             "description": "Kafka topic name abstracted as Outbox binding name"
+        },
+        {
+            "name": "app.credithold.url",
+            "type": "java.lang.String",
+            "description": "URL of hold service"
         }
     ]
 }
