@@ -7,9 +7,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -26,11 +28,13 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import com.creditx.main.dto.CreateHoldRequest;
+import com.creditx.main.dto.CreateHoldResponse;
 import com.creditx.main.dto.CreateTransactionRequest;
 import com.creditx.main.dto.CreateTransactionResponse;
 import com.creditx.main.model.Account;
 import com.creditx.main.model.AccountStatus;
 import com.creditx.main.model.AccountType;
+import com.creditx.main.model.HoldStatus;
 import com.creditx.main.model.Transaction;
 import com.creditx.main.model.TransactionStatus;
 import com.creditx.main.model.TransactionType;
@@ -106,8 +110,14 @@ class TransactionServiceTest {
         given(accountRepository.findById(1L)).willReturn(Optional.of(issuerAccount));
         given(accountRepository.findById(2L)).willReturn(Optional.of(merchantAccount));
         given(transactionRepository.save(any(Transaction.class))).willReturn(savedTransaction);
-        given(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(String.class)))
-                .willReturn(ResponseEntity.ok("Success"));
+        
+        // Mock hold response with hold_id
+        CreateHoldResponse holdResponse = CreateHoldResponse.builder()
+                .holdId(12345L)
+                .status(HoldStatus.AUTHORIZED)
+                .build();
+        given(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(CreateHoldResponse.class)))
+                .willReturn(ResponseEntity.ok(holdResponse));
 
         // When: Creating inbound transaction
         CreateTransactionResponse response = transactionService.createInboundTransaction(validRequest);
@@ -117,9 +127,9 @@ class TransactionServiceTest {
         assertThat(response.getTransactionId()).isEqualTo(999L);
         assertThat(response.getStatus()).isEqualTo(TransactionStatus.PENDING);
 
-        // Verify transaction was saved with correct details
+        // Verify transaction was saved twice: first initial save, then with hold_id
         ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
-        verify(transactionRepository).save(transactionCaptor.capture());
+        verify(transactionRepository, times(2)).save(transactionCaptor.capture());
         
         Transaction capturedTransaction = transactionCaptor.getValue();
         assertThat(capturedTransaction.getType()).isEqualTo(TransactionType.INBOUND);
@@ -137,7 +147,7 @@ class TransactionServiceTest {
         verify(restTemplate).postForEntity(
                 eq("http://localhost:8081/holds"),
                 httpEntityCaptor.capture(),
-                eq(String.class)
+                eq(CreateHoldResponse.class)
         );
 
         // Verify hold request content
@@ -374,8 +384,14 @@ class TransactionServiceTest {
         given(accountRepository.findById(1L)).willReturn(Optional.of(issuerAccount));
         given(accountRepository.findById(2L)).willReturn(Optional.of(merchantAccount));
         given(transactionRepository.save(any(Transaction.class))).willReturn(savedTransaction);
-        given(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(String.class)))
-                .willReturn(ResponseEntity.ok("Success"));
+        
+        // Mock hold response
+        CreateHoldResponse holdResponse = CreateHoldResponse.builder()
+                .holdId(12345L)
+                .status(HoldStatus.AUTHORIZED)
+                .build();
+        given(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(CreateHoldResponse.class)))
+                .willReturn(ResponseEntity.ok(holdResponse));
 
         // When: Creating inbound transaction
         transactionService.createInboundTransaction(validRequest);
@@ -394,5 +410,33 @@ class TransactionServiceTest {
         assertThat(payload).contains("\"merchantAccountId\":2");
         assertThat(payload).contains("\"amount\":150.75");
         assertThat(payload).contains("\"currency\":\"USD\"");
+    }
+
+    @Test
+    void createInboundTransaction_verifyHoldIdUpdate() {
+        // Given: Valid accounts and transaction request
+        given(accountRepository.findById(1L)).willReturn(Optional.of(issuerAccount));
+        given(accountRepository.findById(2L)).willReturn(Optional.of(merchantAccount));
+        given(transactionRepository.save(any(Transaction.class))).willReturn(savedTransaction);
+        
+        // Mock hold response with hold_id
+        CreateHoldResponse holdResponse = CreateHoldResponse.builder()
+                .holdId(12345L)
+                .status(HoldStatus.AUTHORIZED)
+                .build();
+        given(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(CreateHoldResponse.class)))
+                .willReturn(ResponseEntity.ok(holdResponse));
+
+        // When: Creating inbound transaction
+        transactionService.createInboundTransaction(validRequest);
+
+        // Then: Verify transaction was saved twice (initial save + hold_id update)
+        ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
+        verify(transactionRepository, times(2)).save(transactionCaptor.capture());
+        
+        // Verify the final transaction has the hold_id set
+        List<Transaction> savedTransactions = transactionCaptor.getAllValues();
+        Transaction finalTransaction = savedTransactions.get(1); // Second save
+        assertThat(finalTransaction.getHoldId()).isEqualTo(12345L);
     }
 }

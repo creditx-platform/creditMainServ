@@ -12,6 +12,7 @@ import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.creditx.main.dto.CreateHoldRequest;
+import com.creditx.main.dto.CreateHoldResponse;
 import com.creditx.main.dto.CreateTransactionRequest;
 import com.creditx.main.dto.CreateTransactionResponse;
 import com.creditx.main.model.Account;
@@ -66,7 +67,11 @@ public class TransactionServiceImpl implements TransactionService {
         recordInitiatedEvent(txn, issuer, merchant, request.getAmount(), request.getCurrency());
 
         // Send hold request to CreditHoldServ
-        sendHoldRequest(txn, issuer, merchant, request.getAmount(), request.getCurrency());
+        Long holdId = sendHoldRequest(txn, issuer, merchant, request.getAmount(), request.getCurrency());
+        
+        // Update transaction with hold_id
+        txn.setHoldId(holdId);
+        transactionRepository.save(txn);
 
         // Response
         return CreateTransactionResponse.builder()
@@ -101,7 +106,7 @@ public class TransactionServiceImpl implements TransactionService {
         }
     }
 
-    private void sendHoldRequest(Transaction txn, Account issuer, Account merchant, BigDecimal amount, String currency) {
+    private Long sendHoldRequest(Transaction txn, Account issuer, Account merchant, BigDecimal amount, String currency) {
         CreateHoldRequest holdRequest = CreateHoldRequest.builder()
                 .transactionId(txn.getTransactionId())
                 .issuerAccountId(issuer.getAccountId())
@@ -115,7 +120,12 @@ public class TransactionServiceImpl implements TransactionService {
         HttpEntity<CreateHoldRequest> entity = new HttpEntity<>(holdRequest, headers);
 
         try {
-            restTemplate.postForEntity(creditHoldServiceUrl + "/holds", entity, String.class);
+            var response = restTemplate.postForEntity(creditHoldServiceUrl + "/holds", entity, CreateHoldResponse.class);
+            CreateHoldResponse holdResponse = response.getBody();
+            if (holdResponse != null && holdResponse.getHoldId() != null) {
+                return holdResponse.getHoldId();
+            }
+            throw new RuntimeException("Invalid hold response from CreditHoldServ");
         } catch (Exception e) {
             throw new RuntimeException("Failed to send hold request to CreditHoldServ", e);
         }
