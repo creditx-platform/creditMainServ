@@ -4,17 +4,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.oracle.OracleContainer;
 
-@SpringBootTest
+@Testcontainers
+@JdbcTest
 @ActiveProfiles("test")
-@TestPropertySource(properties = {
-    "spring.flyway.locations=classpath:db/migration"
-})
 class SchemaIntegrationTest {
+
+    @SuppressWarnings("resource")
+    @Container
+    static final OracleContainer oracle = new OracleContainer("gvenzl/oracle-free:latest-faststart")
+            .withUsername("testuser")
+            .withPassword("testpassword");
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", oracle::getJdbcUrl);
+        registry.add("spring.datasource.username", oracle::getUsername);
+        registry.add("spring.datasource.password", oracle::getPassword);
+        registry.add("spring.datasource.driver-class-name", () -> "oracle.jdbc.OracleDriver");
+    }
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -56,11 +72,11 @@ class SchemaIntegrationTest {
         jdbcTemplate.update("""
                     INSERT INTO CMS_ACCOUNTS (CUSTOMER_ID, ACCOUNT_TYPE, STATUS, AVAILABLE_BALANCE, RESERVED, CREDIT_LIMIT)
                     VALUES (?, ?, ?, ?, ?, ?)
-                """, 1L, "ISSUER", "ACTIVE", 1000.00, 0.00, 5000.00);
+                """, 999L, "ISSUER", "ACTIVE", 1000.00, 0.00, 5000.00);
 
         Integer accountsCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM CMS_ACCOUNTS WHERE CUSTOMER_ID = ?",
-                Integer.class, 1L);
+                Integer.class, 999L);
         assertThat(accountsCount).isEqualTo(1);
     }
 }
