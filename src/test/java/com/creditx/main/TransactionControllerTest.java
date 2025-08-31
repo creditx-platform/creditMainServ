@@ -13,6 +13,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.creditx.main.controller.TransactionController;
+import com.creditx.main.dto.CommitTransactionResponse;
 import com.creditx.main.dto.CreateTransactionResponse;
 import com.creditx.main.model.TransactionStatus;
 import com.creditx.main.service.TransactionService;
@@ -41,6 +42,26 @@ class TransactionControllerTest {
                                 .andExpect(status().isAccepted())
                                 .andExpect(jsonPath("$.transactionId").value(999))
                                 .andExpect(jsonPath("$.status").value("PENDING"));
+        }
+
+        @Test
+        void commitTransaction_success() throws Exception {
+                given(transactionService.commitTransaction(any())).willReturn(
+                                CommitTransactionResponse.builder()
+                                        .transactionId(999L)
+                                        .status(TransactionStatus.SUCCESS)
+                                        .message("Transaction committed successfully")
+                                        .build());
+
+                String body = "{\"transactionId\":999,\"holdId\":12345}";
+
+                mockMvc.perform(post("/transactions/commitTransaction")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.transactionId").value(999))
+                                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                                .andExpect(jsonPath("$.message").value("Transaction committed successfully"));
         }
 }
 

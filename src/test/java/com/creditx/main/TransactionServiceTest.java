@@ -31,6 +31,8 @@ import com.creditx.main.dto.CreateHoldRequest;
 import com.creditx.main.dto.CreateHoldResponse;
 import com.creditx.main.dto.CreateTransactionRequest;
 import com.creditx.main.dto.CreateTransactionResponse;
+import com.creditx.main.dto.CommitTransactionRequest;
+import com.creditx.main.dto.CommitTransactionResponse;
 import com.creditx.main.model.Account;
 import com.creditx.main.model.AccountStatus;
 import com.creditx.main.model.AccountType;
@@ -38,8 +40,10 @@ import com.creditx.main.model.HoldStatus;
 import com.creditx.main.model.Transaction;
 import com.creditx.main.model.TransactionStatus;
 import com.creditx.main.model.TransactionType;
+import com.creditx.main.model.TransactionEntry;
 import com.creditx.main.repository.AccountRepository;
 import com.creditx.main.repository.TransactionRepository;
+import com.creditx.main.repository.TransactionEntryRepository;
 import com.creditx.main.service.OutboxEventService;
 import com.creditx.main.service.impl.TransactionServiceImpl;
 
@@ -57,6 +61,9 @@ class TransactionServiceTest {
 
     @Mock
     private RestTemplate restTemplate;
+
+    @Mock
+    private TransactionEntryRepository transactionEntryRepository;
 
     @InjectMocks
     private TransactionServiceImpl transactionService;
@@ -445,5 +452,148 @@ class TransactionServiceTest {
         List<Transaction> savedTransactions = transactionCaptor.getAllValues();
         Transaction finalTransaction = savedTransactions.get(1); // Second save
         assertThat(finalTransaction.getHoldId()).isEqualTo(12345L);
+    }
+
+    @Test
+    void commitTransaction_success() {
+        // Given: Transaction in AUTHORIZED state with valid holdId
+        Transaction authorizedTransaction = Transaction.builder()
+                .transactionId(999L)
+                .type(TransactionType.INBOUND)
+                .status(TransactionStatus.AUTHORIZED)
+                .accountId(1L)
+                .merchantId(2L)
+                .holdId(12345L)
+                .amount(new BigDecimal("150.75"))
+                .currency("USD")
+                .build();
+
+        Account issuerAccount = Account.builder()
+                .accountId(1L)
+                .type(AccountType.ISSUER)
+                .status(AccountStatus.ACTIVE)
+                .availableBalance(new BigDecimal("1000.00"))
+                .reserved(new BigDecimal("150.75"))
+                .build();
+
+        Account merchantAccount = Account.builder()
+                .accountId(2L)
+                .type(AccountType.MERCHANT)
+                .status(AccountStatus.ACTIVE)
+                .availableBalance(new BigDecimal("500.00"))
+                .build();
+
+        CommitTransactionRequest request = CommitTransactionRequest.builder()
+                .transactionId(999L)
+                .holdId(12345L)
+                .build();
+
+        given(transactionRepository.findById(999L)).willReturn(Optional.of(authorizedTransaction));
+        given(accountRepository.findById(1L)).willReturn(Optional.of(issuerAccount));
+        given(accountRepository.findById(2L)).willReturn(Optional.of(merchantAccount));
+        given(transactionRepository.save(any(Transaction.class))).willReturn(authorizedTransaction);
+        given(accountRepository.save(any(Account.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(transactionEntryRepository.save(any(TransactionEntry.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        // When: Committing transaction
+        CommitTransactionResponse response = transactionService.commitTransaction(request);
+
+        // Then: Should succeed
+        assertThat(response).isNotNull();
+        assertThat(response.getTransactionId()).isEqualTo(999L);
+        assertThat(response.getStatus()).isEqualTo(TransactionStatus.SUCCESS);
+        assertThat(response.getMessage()).isEqualTo("Transaction committed successfully");
+
+        // Verify transaction status was updated to SUCCESS
+        ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
+        verify(transactionRepository).save(transactionCaptor.capture());
+        assertThat(transactionCaptor.getValue().getStatus()).isEqualTo(TransactionStatus.SUCCESS);
+
+        // Verify account balances were updated
+        ArgumentCaptor<Account> accountCaptor = ArgumentCaptor.forClass(Account.class);
+        verify(accountRepository, times(2)).save(accountCaptor.capture());
+        
+        List<Account> savedAccounts = accountCaptor.getAllValues();
+        Account updatedIssuer = savedAccounts.stream()
+                .filter(acc -> acc.getAccountId().equals(1L))
+                .findFirst()
+                .orElseThrow();
+        Account updatedMerchant = savedAccounts.stream()
+                .filter(acc -> acc.getAccountId().equals(2L))
+                .findFirst()
+                .orElseThrow();
+
+        // Verify issuer account: available balance decreased, reserved decreased
+        assertThat(updatedIssuer.getAvailableBalance()).isEqualTo(new BigDecimal("849.25")); // 1000 - 150.75
+        assertThat(updatedIssuer.getReserved().compareTo(BigDecimal.ZERO)).isEqualTo(0); // 150.75 - 150.75
+
+        // Verify merchant account: available balance increased
+        assertThat(updatedMerchant.getAvailableBalance()).isEqualTo(new BigDecimal("650.75")); // 500 + 150.75
+
+        // Verify transaction entries were created
+        verify(transactionEntryRepository, times(2)).save(any(TransactionEntry.class));
+
+        // Verify outbox event was recorded
+        verify(outboxEventService).saveEvent(eq("transaction.posted"), eq(999L), anyString());
+    }
+
+    @Test
+    void commitTransaction_transactionNotFound() {
+        // Given: Transaction not found
+        CommitTransactionRequest request = CommitTransactionRequest.builder()
+                .transactionId(999L)
+                .holdId(12345L)
+                .build();
+
+        given(transactionRepository.findById(999L)).willReturn(Optional.empty());
+
+        // When & Then: Should throw exception
+        assertThatThrownBy(() -> transactionService.commitTransaction(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Transaction not found");
+    }
+
+    @Test
+    void commitTransaction_wrongStatus() {
+        // Given: Transaction in wrong status (PENDING instead of AUTHORIZED)
+        Transaction pendingTransaction = Transaction.builder()
+                .transactionId(999L)
+                .status(TransactionStatus.PENDING)
+                .holdId(12345L)
+                .build();
+
+        CommitTransactionRequest request = CommitTransactionRequest.builder()
+                .transactionId(999L)
+                .holdId(12345L)
+                .build();
+
+        given(transactionRepository.findById(999L)).willReturn(Optional.of(pendingTransaction));
+
+        // When & Then: Should throw exception
+        assertThatThrownBy(() -> transactionService.commitTransaction(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Transaction must be in AUTHORIZED state to commit");
+    }
+
+    @Test
+    void commitTransaction_holdIdMismatch() {
+        // Given: Transaction with different holdId
+        Transaction authorizedTransaction = Transaction.builder()
+                .transactionId(999L)
+                .status(TransactionStatus.AUTHORIZED)
+                .holdId(54321L) // Different holdId
+                .build();
+
+        CommitTransactionRequest request = CommitTransactionRequest.builder()
+                .transactionId(999L)
+                .holdId(12345L) // Requested holdId
+                .build();
+
+        given(transactionRepository.findById(999L)).willReturn(Optional.of(authorizedTransaction));
+
+        // When & Then: Should throw exception
+        assertThatThrownBy(() -> transactionService.commitTransaction(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Hold ID mismatch");
     }
 }

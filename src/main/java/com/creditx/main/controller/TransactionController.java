@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.creditx.main.dto.CommitTransactionRequest;
+import com.creditx.main.dto.CommitTransactionResponse;
 import com.creditx.main.dto.CreateTransactionRequest;
 import com.creditx.main.dto.CreateTransactionResponse;
 import com.creditx.main.service.TransactionService;
@@ -25,5 +27,11 @@ public class TransactionController {
     public ResponseEntity<CreateTransactionResponse> createTransaction(@Validated @RequestBody CreateTransactionRequest request) {
         var response = transactionService.createInboundTransaction(request);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+    }
+
+    @PostMapping("/commitTransaction")
+    public ResponseEntity<CommitTransactionResponse> commitTransaction(@Validated @RequestBody CommitTransactionRequest request) {
+        var response = transactionService.commitTransaction(request);
+        return ResponseEntity.ok(response);
     }
 }

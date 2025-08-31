@@ -15,14 +15,18 @@ import com.creditx.main.dto.CreateHoldRequest;
 import com.creditx.main.dto.CreateHoldResponse;
 import com.creditx.main.dto.CreateTransactionRequest;
 import com.creditx.main.dto.CreateTransactionResponse;
+import com.creditx.main.dto.CommitTransactionRequest;
+import com.creditx.main.dto.CommitTransactionResponse;
 import com.creditx.main.model.Account;
 import com.creditx.main.model.AccountStatus;
 import com.creditx.main.model.AccountType;
 import com.creditx.main.model.Transaction;
 import com.creditx.main.model.TransactionStatus;
 import com.creditx.main.model.TransactionType;
+import com.creditx.main.model.TransactionEntry;
 import com.creditx.main.repository.AccountRepository;
 import com.creditx.main.repository.TransactionRepository;
+import com.creditx.main.repository.TransactionEntryRepository;
 import com.creditx.main.service.OutboxEventService;
 import com.creditx.main.service.TransactionService;
 
@@ -38,6 +42,7 @@ public class TransactionServiceImpl implements TransactionService {
     private final OutboxEventService outboxEventService;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final TransactionEntryRepository transactionEntryRepository;
 
     @Value("${app.credithold.url:http://localhost:8081}")
     private String creditHoldServiceUrl;
@@ -58,6 +63,7 @@ public class TransactionServiceImpl implements TransactionService {
                 .type(TransactionType.INBOUND)
                 .status(TransactionStatus.PENDING)
                 .accountId(issuer.getAccountId())
+                .merchantId(merchant.getAccountId())
                 .amount(request.getAmount())
                 .currency(request.getCurrency())
                 .build();
@@ -77,6 +83,48 @@ public class TransactionServiceImpl implements TransactionService {
         return CreateTransactionResponse.builder()
                 .transactionId(txn.getTransactionId())
                 .status(txn.getStatus())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public CommitTransactionResponse commitTransaction(CommitTransactionRequest request) {
+        // Find transaction by ID and holdId for idempotency
+        Transaction transaction = transactionRepository.findById(request.getTransactionId())
+                .orElseThrow(() -> new IllegalArgumentException("Transaction not found"));
+        
+        // Validate transaction is in AUTHORIZED state
+        if (!TransactionStatus.AUTHORIZED.equals(transaction.getStatus())) {
+            throw new IllegalArgumentException("Transaction must be in AUTHORIZED state to commit");
+        }
+        
+        // Validate holdId matches
+        if (!request.getHoldId().equals(transaction.getHoldId())) {
+            throw new IllegalArgumentException("Hold ID mismatch");
+        }
+        
+        // Find accounts
+        Account issuer = accountRepository.findById(transaction.getAccountId())
+                .orElseThrow(() -> new IllegalArgumentException("Issuer account not found"));
+        
+        // Find merchant account from transaction or use the merchantId field
+        Account merchant = accountRepository.findById(transaction.getMerchantId())
+                .orElseThrow(() -> new IllegalArgumentException("Merchant account not found"));
+        
+        // Perform double-entry posting
+        performDoubleEntryPosting(transaction, issuer, merchant);
+        
+        // Update transaction status to SUCCESS
+        transaction.setStatus(TransactionStatus.SUCCESS);
+        transactionRepository.save(transaction);
+        
+        // Record outbox event for transaction.posted
+        recordPostedEvent(transaction, issuer, merchant);
+        
+        return CommitTransactionResponse.builder()
+                .transactionId(transaction.getTransactionId())
+                .status(TransactionStatus.SUCCESS)
+                .message("Transaction committed successfully")
                 .build();
     }
 
@@ -131,6 +179,63 @@ public class TransactionServiceImpl implements TransactionService {
         }
     }
 
+    private void performDoubleEntryPosting(Transaction transaction, Account issuer, Account merchant) {
+        BigDecimal amount = transaction.getAmount();
+        
+        // Validate transaction amount is positive
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("Transaction amount must be positive: " + amount);
+        }
+        
+        // Debit issuer account (decrease available balance)
+        issuer.setAvailableBalance(issuer.getAvailableBalance().subtract(amount));
+        
+        // Credit merchant account (increase available balance)
+        merchant.setAvailableBalance(merchant.getAvailableBalance().add(amount));
+        
+        // Release the hold (decrease reserved amount)
+        issuer.setReserved(issuer.getReserved().subtract(amount));
+        
+        // Save account changes
+        accountRepository.save(issuer);
+        accountRepository.save(merchant);
+        
+        // Create transaction entries for audit trail
+        createTransactionEntries(transaction, issuer, merchant, amount);
+    }
+    
+    private void createTransactionEntries(Transaction transaction, Account issuer, Account merchant, BigDecimal amount) {
+        // Debit entry for issuer
+        TransactionEntry issuerEntry = TransactionEntry.builder()
+                .transaction(transaction)
+                .accountId(issuer.getAccountId())
+                .amount(amount.negate()) // Negative for debit
+                .build();
+        
+        // Credit entry for merchant
+        TransactionEntry merchantEntry = TransactionEntry.builder()
+                .transaction(transaction)
+                .accountId(merchant.getAccountId())
+                .amount(amount) // Positive for credit
+                .build();
+        
+        // Save entries
+        transactionEntryRepository.save(issuerEntry);
+        transactionEntryRepository.save(merchantEntry);
+    }
+    
+    private void recordPostedEvent(Transaction transaction, Account issuer, Account merchant) {
+        var payload = new PostedPayload(transaction.getTransactionId(), issuer.getAccountId(), 
+                merchant.getAccountId(), transaction.getAmount(), transaction.getCurrency());
+        try {
+            outboxEventService.saveEvent("transaction.posted", transaction.getTransactionId(), 
+                    objectMapper.writeValueAsString(payload));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize event payload", e);
+        }
+    }
+
     // Simple record for JSON serialization
     private record InitiatedPayload(Long transactionId, Long issuerAccountId, Long merchantAccountId, BigDecimal amount, String currency) {}
+    private record PostedPayload(Long transactionId, Long issuerAccountId, Long merchantAccountId, BigDecimal amount, String currency) {}
 }
