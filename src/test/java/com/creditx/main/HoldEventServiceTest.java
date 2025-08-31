@@ -78,6 +78,7 @@ class HoldEventServiceTest {
                 .type(TransactionType.INBOUND)
                 .status(TransactionStatus.PENDING)
                 .accountId(1L)
+                .merchantId(2L)
                 .holdId(12345L)
                 .amount(new BigDecimal("250.00"))
                 .currency("USD")
@@ -96,7 +97,7 @@ class HoldEventServiceTest {
         // Then: Account balances should be updated
         ArgumentCaptor<Account> accountCaptor = ArgumentCaptor.forClass(Account.class);
         verify(accountRepository).save(accountCaptor.capture());
-        
+           
         Account updatedAccount = accountCaptor.getValue();
         assertThat(updatedAccount.getAvailableBalance()).isEqualByComparingTo(new BigDecimal("750.00")); // 1000 - 250
         assertThat(updatedAccount.getReserved()).isEqualByComparingTo(new BigDecimal("350.00")); // 100 + 250

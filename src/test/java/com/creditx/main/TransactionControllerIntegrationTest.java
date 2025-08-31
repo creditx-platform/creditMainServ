@@ -168,6 +168,7 @@ public class TransactionControllerIntegrationTest {
         assertThat(savedTransaction).isPresent();
         assertThat(savedTransaction.get().getAmount()).isEqualByComparingTo("150.75");
         assertThat(savedTransaction.get().getCurrency()).isEqualTo("USD");
+        assertThat(savedTransaction.get().getMerchantId()).isEqualTo(2L);
 
         // Verify outbox event was created
         var outboxEvents = outboxEventRepository.findAll()

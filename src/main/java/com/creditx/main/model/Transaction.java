@@ -45,6 +45,9 @@ public class Transaction {
     @Column(name = "HOLD_ID")
     private Long holdId;
 
+    @Column(name = "MERCHANT_ID")
+    private Long merchantId;
+
     @Column(name = "AMOUNT", nullable = false, precision = 20, scale = 2)
     private BigDecimal amount;
 

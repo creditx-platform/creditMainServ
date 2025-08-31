@@ -99,6 +99,7 @@ class TransactionServiceTest {
                 .type(TransactionType.INBOUND)
                 .status(TransactionStatus.PENDING)
                 .accountId(1L)
+                .merchantId(2L)
                 .amount(new BigDecimal("150.75"))
                 .currency("USD")
                 .build();
@@ -329,7 +330,7 @@ class TransactionServiceTest {
         given(accountRepository.findById(1L)).willReturn(Optional.of(issuerAccount));
         given(accountRepository.findById(2L)).willReturn(Optional.of(merchantAccount));
         given(transactionRepository.save(any(Transaction.class))).willReturn(savedTransaction);
-        given(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(String.class)))
+        given(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(CreateHoldResponse.class)))
                 .willThrow(new RestClientException("Connection refused"));
 
         // When & Then: Should throw runtime exception
@@ -345,7 +346,7 @@ class TransactionServiceTest {
         verify(outboxEventService).saveEvent(eq("transaction.initiated"), eq(999L), anyString());
 
         // Verify hold request was attempted
-        verify(restTemplate).postForEntity(anyString(), any(HttpEntity.class), eq(String.class));
+        verify(restTemplate).postForEntity(anyString(), any(HttpEntity.class), eq(CreateHoldResponse.class));
     }
 
     @Test
@@ -361,8 +362,14 @@ class TransactionServiceTest {
         given(accountRepository.findById(1L)).willReturn(Optional.of(exactBalanceIssuerAccount));
         given(accountRepository.findById(2L)).willReturn(Optional.of(merchantAccount));
         given(transactionRepository.save(any(Transaction.class))).willReturn(savedTransaction);
-        given(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(String.class)))
-                .willReturn(ResponseEntity.ok("Success"));
+        
+        // Mock hold response with hold_id
+        CreateHoldResponse holdResponse = CreateHoldResponse.builder()
+                .holdId(12345L)
+                .status(HoldStatus.AUTHORIZED)
+                .build();
+        given(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(CreateHoldResponse.class)))
+                .willReturn(ResponseEntity.ok(holdResponse));
 
         // When: Creating inbound transaction
         CreateTransactionResponse response = transactionService.createInboundTransaction(validRequest);
@@ -373,9 +380,9 @@ class TransactionServiceTest {
         assertThat(response.getStatus()).isEqualTo(TransactionStatus.PENDING);
 
         // Verify all services were called
-        verify(transactionRepository).save(any(Transaction.class));
+        verify(transactionRepository, times(2)).save(any(Transaction.class));
         verify(outboxEventService).saveEvent(anyString(), any(), anyString());
-        verify(restTemplate).postForEntity(anyString(), any(HttpEntity.class), eq(String.class));
+        verify(restTemplate).postForEntity(anyString(), any(HttpEntity.class), eq(CreateHoldResponse.class));
     }
 
     @Test
