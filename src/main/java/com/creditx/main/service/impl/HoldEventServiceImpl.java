@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import org.springframework.stereotype.Service;
 
 import com.creditx.main.dto.HoldCreatedEvent;
+import com.creditx.main.dto.HoldExpiredEvent;
 import com.creditx.main.model.Account;
 import com.creditx.main.model.Transaction;
 import com.creditx.main.model.TransactionStatus;
@@ -18,11 +19,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class HoldEventServiceImpl implements HoldEventService {
 
@@ -30,7 +29,17 @@ public class HoldEventServiceImpl implements HoldEventService {
     private final TransactionRepository transactionRepository;
     private final OutboxEventService outboxEventService;
     private final ProcessedEventService processedEventService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
+
+    public HoldEventServiceImpl(AccountRepository accountRepository, TransactionRepository transactionRepository,
+                               OutboxEventService outboxEventService, ProcessedEventService processedEventService) {
+        this.accountRepository = accountRepository;
+        this.transactionRepository = transactionRepository;
+        this.outboxEventService = outboxEventService;
+        this.processedEventService = processedEventService;
+        this.objectMapper = new ObjectMapper();
+        this.objectMapper.findAndRegisterModules(); // This enables JSR310 module for Instant serialization
+    }
 
     @Override
     @Transactional
@@ -124,6 +133,116 @@ public class HoldEventServiceImpl implements HoldEventService {
         }
     }
 
+    @Override
+    @Transactional
+    public void processHoldExpired(HoldExpiredEvent event) {
+        // Generate unique event ID for deduplication
+        String eventId = EventIdGenerator.generateEventId("hold.expired", event.getTransactionId());
+        
+        // Check if event has already been processed
+        if (processedEventService.isEventProcessed(eventId)) {
+            log.info("Event {} has already been processed, skipping", eventId);
+            return;
+        }
+        
+        try {
+            // Generate payload hash for additional deduplication
+            String payload = objectMapper.writeValueAsString(event);
+            String payloadHash = EventIdGenerator.generatePayloadHash(payload);
+            
+            // Check if payload has already been processed
+            if (processedEventService.isPayloadProcessed(payloadHash)) {
+                log.info("Payload with hash {} has already been processed, skipping", payloadHash);
+                return;
+            }
+            
+            // Find transaction by ID first
+            Transaction transaction = transactionRepository.findById(event.getTransactionId())
+                    .orElseThrow(() -> new IllegalArgumentException("Transaction not found: " + event.getTransactionId()));
+            
+            // Check if transaction is in a state that allows expiry
+            if (!isTransactionExpirable(transaction)) {
+                log.info("Transaction {} is in status {} and cannot be expired, skipping", 
+                        transaction.getTransactionId(), transaction.getStatus());
+                processedEventService.markEventAsProcessed(eventId, payloadHash, "SKIPPED");
+                return;
+            }
+            
+            // Find account by accountId from the hold expired event
+            Account account = accountRepository.findById(event.getAccountId())
+                    .orElseThrow(() -> new IllegalArgumentException("Account not found: " + event.getAccountId()));
+            
+            // Release funds: available_balance += amount, reserved -= amount
+            releaseFunds(account, event.getAmount());
+            accountRepository.save(account);
+
+            // Update transaction status to FAILED
+            transaction.setStatus(TransactionStatus.FAILED);
+            transactionRepository.save(transaction);
+
+            // Publish transaction.failed event
+            publishTransactionFailed(transaction, event);
+            
+            // Mark event as processed
+            processedEventService.markEventAsProcessed(eventId, payloadHash, "SUCCESS");
+            log.info("Successfully processed hold.expired event for transaction: {}", event.getTransactionId());
+            
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize event payload for transaction: {}", event.getTransactionId(), e);
+            processedEventService.markEventAsProcessed(eventId, "", "FAILED");
+            throw new RuntimeException("Failed to serialize event payload", e);
+        } catch (Exception e) {
+            log.error("Failed to process hold.expired event for transaction: {}", event.getTransactionId(), e);
+            // Mark event as processed with failed status
+            processedEventService.markEventAsProcessed(eventId, "", "FAILED");
+            throw e;
+        }
+    }
+
+    private boolean isTransactionExpirable(Transaction transaction) {
+        // Only AUTHORIZED transactions can be expired
+        // PENDING, SUCCESS, and FAILED transactions should not be expired
+        return TransactionStatus.AUTHORIZED.equals(transaction.getStatus());
+    }
+
+    private void releaseFunds(Account account, BigDecimal amount) {
+        // Release funds: available_balance += amount, reserved -= amount
+        BigDecimal newAvailableBalance = account.getAvailableBalance().add(amount);
+        BigDecimal newReservedBalance = account.getReserved().subtract(amount);
+        
+        // Validate reserved balance doesn't go negative (defensive check)
+        if (newReservedBalance.compareTo(BigDecimal.ZERO) < 0) {
+            log.warn("Reserved balance would go negative for account {}, setting to zero. Reserved: {}, Amount: {}",
+                    account.getAccountId(), account.getReserved(), amount);
+            newReservedBalance = BigDecimal.ZERO;
+        }
+        
+        account.setAvailableBalance(newAvailableBalance);
+        account.setReserved(newReservedBalance);
+    }
+
+    private void publishTransactionFailed(Transaction transaction, HoldExpiredEvent holdEvent) {
+        var payload = new FailedPayload(
+                transaction.getTransactionId(),
+                holdEvent.getHoldId(),
+                holdEvent.getAccountId(),
+                transaction.getAmount(),
+                transaction.getCurrency(),
+                transaction.getStatus().toString(),
+                "Hold expired"
+        );
+
+        try {
+            outboxEventService.saveEvent(
+                    "transaction.failed",
+                    transaction.getTransactionId(),
+                    objectMapper.writeValueAsString(payload)
+            );
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize transaction failed event payload", e);
+        }
+    }
+
     // Simple record for JSON serialization
     private record AuthorizedPayload(
             Long transactionId,
@@ -133,5 +252,16 @@ public class HoldEventServiceImpl implements HoldEventService {
             BigDecimal amount,
             String currency,
             String status
+    ) {}
+
+    // Simple record for JSON serialization
+    private record FailedPayload(
+            Long transactionId,
+            Long holdId,
+            Long accountId,
+            BigDecimal amount,
+            String currency,
+            String status,
+            String reason
     ) {}
 }

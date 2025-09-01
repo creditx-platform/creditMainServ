@@ -29,6 +29,7 @@ import com.creditx.main.model.TransactionType;
 import com.creditx.main.repository.AccountRepository;
 import com.creditx.main.repository.TransactionRepository;
 import com.creditx.main.service.OutboxEventService;
+import com.creditx.main.service.ProcessedEventService;
 import com.creditx.main.service.impl.HoldEventServiceImpl;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,6 +43,9 @@ class HoldEventServiceTest {
 
     @Mock
     private OutboxEventService outboxEventService;
+
+    @Mock
+    private ProcessedEventService processedEventService;
 
     @InjectMocks
     private HoldEventServiceImpl holdEventService;
@@ -88,6 +92,8 @@ class HoldEventServiceTest {
     @Test
     void processHoldCreated_success() {
         // Given: Valid event and existing account/transaction
+        given(processedEventService.isEventProcessed(anyString())).willReturn(false);
+        given(processedEventService.isPayloadProcessed(anyString())).willReturn(false);
         given(accountRepository.findById(1L)).willReturn(Optional.of(issuerAccount));
         given(transactionRepository.findById(999L)).willReturn(Optional.of(transaction));
 
