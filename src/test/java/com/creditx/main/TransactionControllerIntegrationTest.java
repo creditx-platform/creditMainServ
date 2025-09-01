@@ -63,7 +63,7 @@ public class TransactionControllerIntegrationTest {
         registry.add("spring.datasource.driver-class-name", () -> "oracle.jdbc.OracleDriver");
     }
 
-    @MockitoBean
+    @MockitoBean(name = "restTemplate")
     private RestTemplate mockedCreditHoldServiceClient;
 
     @LocalServerPort
@@ -147,9 +147,9 @@ public class TransactionControllerIntegrationTest {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
 
-        // When: POST request is made to create transaction
-        ResponseEntity<CreateTransactionResponse> response = testHttpClient.exchange(
-                "/transactions",
+    // When: POST request is made to create transaction
+    ResponseEntity<CreateTransactionResponse> response = testHttpClient.exchange(
+        "/api/transactions",
                 HttpMethod.POST,
                 request,
                 CreateTransactionResponse.class);
@@ -227,9 +227,9 @@ public class TransactionControllerIntegrationTest {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
 
-        // When & Then: Should return error and no events should be created
-        ResponseEntity<String> response = testHttpClient.exchange(
-                "/transactions",
+    // When & Then: Should return error and no events should be created
+    ResponseEntity<String> response = testHttpClient.exchange(
+        "/api/transactions",
                 HttpMethod.POST,
                 request,
                 String.class);
@@ -262,9 +262,9 @@ public class TransactionControllerIntegrationTest {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
 
-        // When & Then: Should return error for inactive account
-        ResponseEntity<String> response = testHttpClient.exchange(
-                "/transactions",
+    // When & Then: Should return error for inactive account
+    ResponseEntity<String> response = testHttpClient.exchange(
+        "/api/transactions",
                 HttpMethod.POST,
                 request,
                 String.class);
@@ -309,15 +309,15 @@ public class TransactionControllerIntegrationTest {
         stubSuccessfulHoldResponse(201L);
         stubSuccessfulHoldResponse(202L);
 
-        // When: Both transactions are created
-        ResponseEntity<CreateTransactionResponse> response1 = testHttpClient.exchange(
-                "/transactions",
+    // When: Both transactions are created
+    ResponseEntity<CreateTransactionResponse> response1 = testHttpClient.exchange(
+        "/api/transactions",
                 HttpMethod.POST,
                 new HttpEntity<>(request1, headers),
                 CreateTransactionResponse.class);
 
-        ResponseEntity<CreateTransactionResponse> response2 = testHttpClient.exchange(
-                "/transactions",
+    ResponseEntity<CreateTransactionResponse> response2 = testHttpClient.exchange(
+        "/api/transactions",
                 HttpMethod.POST,
                 new HttpEntity<>(request2, headers),
                 CreateTransactionResponse.class);

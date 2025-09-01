@@ -32,9 +32,11 @@ import com.creditx.main.service.TransactionService;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TransactionServiceImpl implements TransactionService {
 
     private final AccountRepository accountRepository;
@@ -50,12 +52,16 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     @Transactional
     public CreateTransactionResponse createInboundTransaction(CreateTransactionRequest request) {
+        log.info("Creating inbound transaction for issuer: {}, merchant: {}, amount: {}", 
+                request.getIssuerAccountId(), request.getMerchantAccountId(), request.getAmount());
+        
         // Fetch accounts
         Account issuer = accountRepository.findById(request.getIssuerAccountId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer account not found"));
         Account merchant = accountRepository.findById(request.getMerchantAccountId())
                 .orElseThrow(() -> new IllegalArgumentException("Merchant account not found"));
 
+        log.info("Found accounts - Issuer: {}, Merchant: {}", issuer.getAccountId(), merchant.getAccountId());
         validateAccounts(issuer, merchant, request.getAmount());
 
         // Create Transaction with status = PENDING
@@ -73,11 +79,25 @@ public class TransactionServiceImpl implements TransactionService {
         recordInitiatedEvent(txn, issuer, merchant, request.getAmount(), request.getCurrency());
 
         // Send hold request to CreditHoldServ
-        Long holdId = sendHoldRequest(txn, issuer, merchant, request.getAmount(), request.getCurrency());
+        CreateHoldResponse holdResponse = sendHoldRequest(txn, issuer, merchant, request.getAmount(), request.getCurrency());
         
-        // Update transaction with hold_id
-        txn.setHoldId(holdId);
+        // Update transaction with hold_id and status
+        txn.setHoldId(holdResponse.getHoldId());
+        log.info("=== TRANSACTION STATUS UPDATE START ===");
+        log.info("Hold response status: {}", holdResponse.getStatus());
+        log.info("Current transaction status before update: {}", txn.getStatus());
+        
+        // Update transaction status based on hold response
+        if ("AUTHORIZED".equals(holdResponse.getStatus().toString())) {
+            log.info("Hold status is AUTHORIZED, updating transaction status to AUTHORIZED");
+            txn.setStatus(TransactionStatus.AUTHORIZED);
+        } else {
+            log.info("Hold status is NOT AUTHORIZED: {}", holdResponse.getStatus());
+            txn.setStatus(TransactionStatus.FAILED);
+        }
+        log.info("Transaction status after update: {}", txn.getStatus());
         transactionRepository.save(txn);
+        log.info("=== TRANSACTION STATUS UPDATE END ===");
 
         // Response
         return CreateTransactionResponse.builder()
@@ -88,9 +108,9 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Override
     @Transactional
-    public CommitTransactionResponse commitTransaction(CommitTransactionRequest request) {
+    public CommitTransactionResponse commitTransaction(Long transactionId, CommitTransactionRequest request) {
         // Find transaction by ID and holdId for idempotency
-        Transaction transaction = transactionRepository.findById(request.getTransactionId())
+        Transaction transaction = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new IllegalArgumentException("Transaction not found"));
         
         // Validate transaction is in AUTHORIZED state
@@ -154,7 +174,11 @@ public class TransactionServiceImpl implements TransactionService {
         }
     }
 
-    private Long sendHoldRequest(Transaction txn, Account issuer, Account merchant, BigDecimal amount, String currency) {
+    private CreateHoldResponse sendHoldRequest(Transaction txn, Account issuer, Account merchant, BigDecimal amount, String currency) {
+        log.info("=== SEND HOLD REQUEST START ===");
+        log.info("CreditHoldServiceUrl configured as: {}", creditHoldServiceUrl);
+        log.info("Sending hold request for transaction {}", txn.getTransactionId());
+        
         CreateHoldRequest holdRequest = CreateHoldRequest.builder()
                 .transactionId(txn.getTransactionId())
                 .issuerAccountId(issuer.getAccountId())
@@ -163,18 +187,33 @@ public class TransactionServiceImpl implements TransactionService {
                 .currency(currency)
                 .build();
 
+        log.info("Hold request payload: transactionId={}, issuerAccountId={}, merchantAccountId={}, amount={}, currency={}", 
+                holdRequest.getTransactionId(), holdRequest.getIssuerAccountId(), 
+                holdRequest.getMerchantAccountId(), holdRequest.getAmount(), holdRequest.getCurrency());
+        
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<CreateHoldRequest> entity = new HttpEntity<>(holdRequest, headers);
 
         try {
-            var response = restTemplate.postForEntity(creditHoldServiceUrl + "/holds", entity, CreateHoldResponse.class);
+            String url = creditHoldServiceUrl + "/holds";
+            log.info("Making POST request to URL: {}", url);
+            var response = restTemplate.postForEntity(url, entity, CreateHoldResponse.class);
+            log.info("Response status: {}", response.getStatusCode());
+            log.info("Response body: {}", response.getBody());
+            
             CreateHoldResponse holdResponse = response.getBody();
             if (holdResponse != null && holdResponse.getHoldId() != null) {
-                return holdResponse.getHoldId();
+                log.info("Hold created successfully with ID: {}", holdResponse.getHoldId());
+                log.info("=== SEND HOLD REQUEST SUCCESS ===");
+                return holdResponse;
             }
+            log.error("Invalid hold response from CreditHoldServ: {}", holdResponse);
             throw new RuntimeException("Invalid hold response from CreditHoldServ");
         } catch (Exception e) {
+            log.error("Exception during hold request: {}", e.getMessage());
+            log.error("Exception type: {}", e.getClass().getSimpleName());
+            log.error("=== SEND HOLD REQUEST FAILED ===", e);
             throw new RuntimeException("Failed to send hold request to CreditHoldServ", e);
         }
     }

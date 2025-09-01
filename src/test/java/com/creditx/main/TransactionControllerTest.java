@@ -36,7 +36,7 @@ class TransactionControllerTest {
 
                 String body = "{\"issuerAccountId\":1,\"merchantAccountId\":2,\"amount\":100.00,\"currency\":\"USD\"}";
 
-                mockMvc.perform(post("/transactions")
+                mockMvc.perform(post("/api/transactions")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
                                 .andExpect(status().isAccepted())
@@ -46,16 +46,16 @@ class TransactionControllerTest {
 
         @Test
         void commitTransaction_success() throws Exception {
-                given(transactionService.commitTransaction(any())).willReturn(
+                given(transactionService.commitTransaction(any(Long.class), any())).willReturn(
                                 CommitTransactionResponse.builder()
                                         .transactionId(999L)
                                         .status(TransactionStatus.SUCCESS)
                                         .message("Transaction committed successfully")
                                         .build());
 
-                String body = "{\"transactionId\":999,\"holdId\":12345}";
+                String body = "{\"holdId\":12345}";
 
-                mockMvc.perform(post("/transactions/commitTransaction")
+                mockMvc.perform(post("/api/transactions/999/commit")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
                                 .andExpect(status().isOk())

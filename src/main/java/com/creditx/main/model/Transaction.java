@@ -36,7 +36,7 @@ public class Transaction {
     private TransactionType type;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "STATE", nullable = false, length = 50)
+    @Column(name = "STATUS", nullable = false, length = 50)
     private TransactionStatus status;
 
     @Column(name = "ACCOUNT_ID")

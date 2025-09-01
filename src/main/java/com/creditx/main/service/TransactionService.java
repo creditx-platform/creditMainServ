@@ -7,5 +7,5 @@ import com.creditx.main.dto.CreateTransactionResponse;
 
 public interface TransactionService {
     CreateTransactionResponse createInboundTransaction(CreateTransactionRequest request);
-    CommitTransactionResponse commitTransaction(CommitTransactionRequest request);
+    CommitTransactionResponse commitTransaction(Long transactionId, CommitTransactionRequest request);
 }

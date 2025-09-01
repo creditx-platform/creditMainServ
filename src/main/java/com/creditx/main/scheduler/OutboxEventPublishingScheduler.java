@@ -27,7 +27,11 @@ public class OutboxEventPublishingScheduler {
 
         for (OutboxEvent event : events) {
             try {
-                outboxStreamPublisher.publish(event.getAggregateId().toString(), event.getPayload());
+                // Only publish transaction.authorized events to the transactions topic
+                // Other event types (transaction.initiated, transaction.posted, etc.) are stored but not published
+                if ("transaction.authorized".equals(event.getEventType())) {
+                    outboxStreamPublisher.publish(event.getAggregateId().toString(), event.getPayload());
+                }
                 outboxEventService.markAsPublished(event);
             } catch (Exception e) {
                 outboxEventService.markAsFailed(event);

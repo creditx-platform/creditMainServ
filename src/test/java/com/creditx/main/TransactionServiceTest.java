@@ -133,7 +133,7 @@ class TransactionServiceTest {
         // Then: Response should be successful
         assertThat(response).isNotNull();
         assertThat(response.getTransactionId()).isEqualTo(999L);
-        assertThat(response.getStatus()).isEqualTo(TransactionStatus.PENDING);
+        assertThat(response.getStatus()).isEqualTo(TransactionStatus.AUTHORIZED);
 
         // Verify transaction was saved twice: first initial save, then with hold_id
         ArgumentCaptor<Transaction> transactionCaptor = ArgumentCaptor.forClass(Transaction.class);
@@ -141,7 +141,7 @@ class TransactionServiceTest {
         
         Transaction capturedTransaction = transactionCaptor.getValue();
         assertThat(capturedTransaction.getType()).isEqualTo(TransactionType.INBOUND);
-        assertThat(capturedTransaction.getStatus()).isEqualTo(TransactionStatus.PENDING);
+        assertThat(capturedTransaction.getStatus()).isEqualTo(TransactionStatus.AUTHORIZED);
         assertThat(capturedTransaction.getAccountId()).isEqualTo(1L);
         assertThat(capturedTransaction.getAmount()).isEqualByComparingTo(new BigDecimal("150.75"));
         assertThat(capturedTransaction.getCurrency()).isEqualTo("USD");
@@ -384,7 +384,7 @@ class TransactionServiceTest {
         // Then: Should succeed
         assertThat(response).isNotNull();
         assertThat(response.getTransactionId()).isEqualTo(999L);
-        assertThat(response.getStatus()).isEqualTo(TransactionStatus.PENDING);
+        assertThat(response.getStatus()).isEqualTo(TransactionStatus.AUTHORIZED);
 
         // Verify all services were called
         verify(transactionRepository, times(2)).save(any(Transaction.class));
@@ -484,7 +484,6 @@ class TransactionServiceTest {
                 .build();
 
         CommitTransactionRequest request = CommitTransactionRequest.builder()
-                .transactionId(999L)
                 .holdId(12345L)
                 .build();
 
@@ -496,7 +495,7 @@ class TransactionServiceTest {
         given(transactionEntryRepository.save(any(TransactionEntry.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         // When: Committing transaction
-        CommitTransactionResponse response = transactionService.commitTransaction(request);
+        CommitTransactionResponse response = transactionService.commitTransaction(999L, request);
 
         // Then: Should succeed
         assertThat(response).isNotNull();
@@ -541,14 +540,13 @@ class TransactionServiceTest {
     void commitTransaction_transactionNotFound() {
         // Given: Transaction not found
         CommitTransactionRequest request = CommitTransactionRequest.builder()
-                .transactionId(999L)
                 .holdId(12345L)
                 .build();
 
         given(transactionRepository.findById(999L)).willReturn(Optional.empty());
 
         // When & Then: Should throw exception
-        assertThatThrownBy(() -> transactionService.commitTransaction(request))
+        assertThatThrownBy(() -> transactionService.commitTransaction(999L, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Transaction not found");
     }
@@ -563,14 +561,13 @@ class TransactionServiceTest {
                 .build();
 
         CommitTransactionRequest request = CommitTransactionRequest.builder()
-                .transactionId(999L)
                 .holdId(12345L)
                 .build();
 
         given(transactionRepository.findById(999L)).willReturn(Optional.of(pendingTransaction));
 
         // When & Then: Should throw exception
-        assertThatThrownBy(() -> transactionService.commitTransaction(request))
+        assertThatThrownBy(() -> transactionService.commitTransaction(999L, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Transaction must be in AUTHORIZED state to commit");
     }
@@ -585,14 +582,13 @@ class TransactionServiceTest {
                 .build();
 
         CommitTransactionRequest request = CommitTransactionRequest.builder()
-                .transactionId(999L)
                 .holdId(12345L) // Requested holdId
                 .build();
 
         given(transactionRepository.findById(999L)).willReturn(Optional.of(authorizedTransaction));
 
         // When & Then: Should throw exception
-        assertThatThrownBy(() -> transactionService.commitTransaction(request))
+        assertThatThrownBy(() -> transactionService.commitTransaction(999L, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Hold ID mismatch");
     }

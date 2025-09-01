@@ -14,11 +14,13 @@ import com.creditx.main.repository.TransactionRepository;
 import com.creditx.main.service.HoldEventService;
 import com.creditx.main.service.OutboxEventService;
 import com.creditx.main.service.ProcessedEventService;
+import jakarta.validation.constraints.NotNull;
 import com.creditx.main.util.EventIdGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.transaction.Transactional;
+import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
@@ -112,6 +114,12 @@ public class HoldEventServiceImpl implements HoldEventService {
     }
 
     private void publishTransactionAuthorized(Transaction transaction, HoldCreatedEvent holdEvent) {
+        // Validate that holdEvent has a holdId - this should never be null
+        if (holdEvent.getHoldId() == null) {
+            log.error("Cannot publish transaction.authorized event - holdId is null for transaction: {}", transaction.getTransactionId());
+            throw new IllegalStateException("HoldId cannot be null when publishing transaction.authorized event");
+        }
+        
         var payload = new AuthorizedPayload(
                 transaction.getTransactionId(),
                 holdEvent.getHoldId(),
@@ -128,6 +136,8 @@ public class HoldEventServiceImpl implements HoldEventService {
                     transaction.getTransactionId(),
                     objectMapper.writeValueAsString(payload)
             );
+            log.debug("Published transaction.authorized event for transaction: {} with holdId: {}", 
+                    transaction.getTransactionId(), holdEvent.getHoldId());
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize transaction authorized event payload", e);
         }
@@ -245,13 +255,13 @@ public class HoldEventServiceImpl implements HoldEventService {
 
     // Simple record for JSON serialization
     private record AuthorizedPayload(
-            Long transactionId,
-            Long holdId,
-            Long issuerAccountId,
-            Long merchantAccountId,
-            BigDecimal amount,
-            String currency,
-            String status
+            @NotNull Long transactionId,
+            @NotNull Long holdId,
+            @NotNull Long issuerAccountId,
+            @NotNull Long merchantAccountId,
+            @NotNull BigDecimal amount,
+            @NotNull String currency,
+            @NotNull String status
     ) {}
 
     // Simple record for JSON serialization
