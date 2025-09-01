@@ -17,6 +17,7 @@ import org.springframework.test.context.DynamicPropertySource;
 @Import(TestChannelBinderConfiguration.class)
 class CreditMainServApplicationTests {
 
+	@SuppressWarnings("resource")
 	@Container
 	static OracleContainer oracle = new OracleContainer("gvenzl/oracle-free:latest-faststart")
 			.withDatabaseName("testdb")

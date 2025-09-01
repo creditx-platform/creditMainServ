@@ -27,9 +27,9 @@ public class OutboxEventPublishingScheduler {
 
         for (OutboxEvent event : events) {
             try {
-                // Only publish transaction.authorized events to the transactions topic
-                // Other event types (transaction.initiated, transaction.posted, etc.) are stored but not published
-                if ("transaction.authorized".equals(event.getEventType())) {
+                // Publish transaction events to Kafka for other services to consume
+                // These events help maintain consistency across the distributed system
+                if (isPublishableEvent(event.getEventType())) {
                     outboxStreamPublisher.publish(event.getAggregateId().toString(), event.getPayload());
                 }
                 outboxEventService.markAsPublished(event);
@@ -37,5 +37,11 @@ public class OutboxEventPublishingScheduler {
                 outboxEventService.markAsFailed(event);
             }
         }
+    }
+    
+    private boolean isPublishableEvent(String eventType) {
+        return "transaction.authorized".equals(eventType) || 
+               "transaction.posted".equals(eventType) || 
+               "transaction.failed".equals(eventType);
     }
 }
