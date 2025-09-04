@@ -40,6 +40,7 @@ import com.creditx.main.repository.AccountRepository;
 import com.creditx.main.repository.TransactionRepository;
 import com.creditx.main.repository.TransactionEntryRepository;
 import com.creditx.main.service.OutboxEventService;
+import com.creditx.main.tracing.TransactionSpanTagger;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionServiceImplTest {
@@ -58,6 +59,9 @@ class TransactionServiceImplTest {
 
     @Mock
     private TransactionEntryRepository transactionEntryRepository;
+
+    @Mock
+    private TransactionSpanTagger transactionSpanTagger;
 
     @InjectMocks
     private TransactionServiceImpl transactionService;

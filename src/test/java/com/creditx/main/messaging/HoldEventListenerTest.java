@@ -26,194 +26,204 @@ import com.creditx.main.dto.HoldVoidedEvent;
 import com.creditx.main.service.HoldEventService;
 import com.creditx.main.util.EventValidationUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.creditx.main.tracing.TransactionSpanTagger;
 
 @ExtendWith(MockitoExtension.class)
 class HoldEventListenerTest {
-    @Mock
-    private HoldEventService holdEventService;
+        @Mock
+        private HoldEventService holdEventService;
 
-    @Mock
-    private ObjectMapper objectMapper;
+        @Mock
+        private ObjectMapper objectMapper;
 
-    @InjectMocks
-    private HoldEventListener holdEventListener;
+        @Mock
+        private TransactionSpanTagger transactionSpanTagger;
 
-    private Consumer<Message<String>> holdCreatedConsumer;
-    private Consumer<Message<String>> holdExpiredConsumer;
-    private Consumer<Message<String>> holdVoidedConsumer;
+        @InjectMocks
+        private HoldEventListener holdEventListener;
 
-    @BeforeEach
-    void setup() {
-        holdCreatedConsumer = holdEventListener.holdCreated();
-        holdExpiredConsumer = holdEventListener.holdExpired();
-        holdVoidedConsumer = holdEventListener.holdVoided();
-    }
+        private Consumer<Message<String>> holdCreatedConsumer;
+        private Consumer<Message<String>> holdExpiredConsumer;
+        private Consumer<Message<String>> holdVoidedConsumer;
 
-    @Test
-    void shouldProcessValidHoldCreatedEvent() throws Exception {
-        // given
-        String payload = "{\"transactionId\":123,\"holdId\":456}";
-
-        Message<String> message = MessageBuilder
-                .withPayload(payload)
-                .setHeader("eventType", EventTypes.HOLD_CREATED)
-                .build();
-
-        HoldCreatedEvent event = new HoldCreatedEvent();
-        event.setTransactionId(123L);
-        event.setHoldId(456L);
-
-        try (MockedStatic<EventValidationUtils> mockedUtils = Mockito.mockStatic(EventValidationUtils.class)) {
-            mockedUtils.when(() -> EventValidationUtils.validateEventType(message, EventTypes.HOLD_CREATED))
-                    .thenReturn(true);
-
-            Mockito.lenient().when(objectMapper.readValue(payload, HoldCreatedEvent.class)).thenReturn(event);
-
-            // when
-            holdCreatedConsumer.accept(message);
-
-            // then
-            verify(holdEventService, times(1)).processHoldCreated(event);
+        @BeforeEach
+        void setup() {
+                holdCreatedConsumer = holdEventListener.holdCreated();
+                holdExpiredConsumer = holdEventListener.holdExpired();
+                holdVoidedConsumer = holdEventListener.holdVoided();
         }
-    }
 
-    @ParameterizedTest
-    @ValueSource(strings = { EventTypes.TRANSACTION_AUTHORIZED, EventTypes.HOLD_EXPIRED, EventTypes.HOLD_VOIDED,
-            EventTypes.TRANSACTION_FAILED, EventTypes.TRANSACTION_INITIATED, EventTypes.TRANSACTION_POSTED })
-    void shouldNotProcessInvalidHoldCreatedEvent(String eventType) throws Exception {
-        // given
-        String payload = "{\"transactionId\":123,\"holdId\":456}";
+        @Test
+        void shouldProcessValidHoldCreatedEvent() throws Exception {
+                // given
+                String payload = "{\"transactionId\":123,\"holdId\":456}";
 
-        Message<String> message = MessageBuilder
-                .withPayload(payload)
-                .setHeader("eventType", eventType)
-                .build();
+                Message<String> message = MessageBuilder
+                                .withPayload(payload)
+                                .setHeader("eventType", EventTypes.HOLD_CREATED)
+                                .build();
 
-        HoldCreatedEvent event = new HoldCreatedEvent();
-        event.setTransactionId(123L);
-        event.setHoldId(456L);
+                HoldCreatedEvent event = new HoldCreatedEvent();
+                event.setTransactionId(123L);
+                event.setHoldId(456L);
 
-        try (MockedStatic<EventValidationUtils> mockedUtils = Mockito.mockStatic(EventValidationUtils.class)) {
-            mockedUtils.when(() -> EventValidationUtils.validateEventType(message, EventTypes.HOLD_CREATED))
-                    .thenReturn(false);
+                try (MockedStatic<EventValidationUtils> mockedUtils = Mockito.mockStatic(EventValidationUtils.class)) {
+                        mockedUtils.when(() -> EventValidationUtils.validateEventType(message, EventTypes.HOLD_CREATED))
+                                        .thenReturn(true);
 
-            // when
-            holdCreatedConsumer.accept(message);
+                        Mockito.lenient().when(objectMapper.readValue(payload, HoldCreatedEvent.class))
+                                        .thenReturn(event);
 
-            // then
-            verify(holdEventService, never()).processHoldCreated(event);
+                        // when
+                        holdCreatedConsumer.accept(message);
+
+                        // then
+                        verify(holdEventService, times(1)).processHoldCreated(event);
+                }
         }
-    }
 
-    @Test
-    void shouldProcessValidHoldExpiredEvent() throws Exception {
-        // given
-        String payload = "{\"transactionId\":123,\"holdId\":456}";
+        @ParameterizedTest
+        @ValueSource(strings = { EventTypes.TRANSACTION_AUTHORIZED, EventTypes.HOLD_EXPIRED, EventTypes.HOLD_VOIDED,
+                        EventTypes.TRANSACTION_FAILED, EventTypes.TRANSACTION_INITIATED,
+                        EventTypes.TRANSACTION_POSTED })
+        void shouldNotProcessInvalidHoldCreatedEvent(String eventType) throws Exception {
+                // given
+                String payload = "{\"transactionId\":123,\"holdId\":456}";
 
-        Message<String> message = MessageBuilder
-                .withPayload(payload)
-                .setHeader("eventType", EventTypes.HOLD_EXPIRED)
-                .build();
+                Message<String> message = MessageBuilder
+                                .withPayload(payload)
+                                .setHeader("eventType", eventType)
+                                .build();
 
-        HoldExpiredEvent event = new HoldExpiredEvent();
-        event.setTransactionId(123L);
-        event.setHoldId(456L);
+                HoldCreatedEvent event = new HoldCreatedEvent();
+                event.setTransactionId(123L);
+                event.setHoldId(456L);
 
-        try (MockedStatic<EventValidationUtils> mockedUtils = Mockito.mockStatic(EventValidationUtils.class)) {
-            mockedUtils.when(() -> EventValidationUtils.validateEventType(message, EventTypes.HOLD_EXPIRED))
-                    .thenReturn(true);
+                try (MockedStatic<EventValidationUtils> mockedUtils = Mockito.mockStatic(EventValidationUtils.class)) {
+                        mockedUtils.when(() -> EventValidationUtils.validateEventType(message, EventTypes.HOLD_CREATED))
+                                        .thenReturn(false);
 
-            Mockito.lenient().when(objectMapper.readValue(payload, HoldExpiredEvent.class)).thenReturn(event);
+                        // when
+                        holdCreatedConsumer.accept(message);
 
-            // when
-            holdExpiredConsumer.accept(message);
-
-            // then
-            verify(holdEventService, times(1)).processHoldExpired(event);
+                        // then
+                        verify(holdEventService, never()).processHoldCreated(event);
+                }
         }
-    }
 
-    @ParameterizedTest
-    @ValueSource(strings = { EventTypes.TRANSACTION_AUTHORIZED, EventTypes.HOLD_CREATED, EventTypes.HOLD_VOIDED,
-            EventTypes.TRANSACTION_FAILED, EventTypes.TRANSACTION_INITIATED, EventTypes.TRANSACTION_POSTED })
-    void shouldNotProcessInvalidHoldExpiredEvent(String eventType) throws Exception {
-        // given
-        String payload = "{\"transactionId\":123,\"holdId\":456}";
+        @Test
+        void shouldProcessValidHoldExpiredEvent() throws Exception {
+                // given
+                String payload = "{\"transactionId\":123,\"holdId\":456}";
 
-        Message<String> message = MessageBuilder
-                .withPayload(payload)
-                .setHeader("eventType", eventType)
-                .build();
+                Message<String> message = MessageBuilder
+                                .withPayload(payload)
+                                .setHeader("eventType", EventTypes.HOLD_EXPIRED)
+                                .build();
 
-        HoldExpiredEvent event = new HoldExpiredEvent();
-        event.setTransactionId(123L);
-        event.setHoldId(456L);
+                HoldExpiredEvent event = new HoldExpiredEvent();
+                event.setTransactionId(123L);
+                event.setHoldId(456L);
 
-        try (MockedStatic<EventValidationUtils> mockedUtils = Mockito.mockStatic(EventValidationUtils.class)) {
-            mockedUtils.when(() -> EventValidationUtils.validateEventType(message, EventTypes.HOLD_EXPIRED))
-                    .thenReturn(false);
+                try (MockedStatic<EventValidationUtils> mockedUtils = Mockito.mockStatic(EventValidationUtils.class)) {
+                        mockedUtils.when(() -> EventValidationUtils.validateEventType(message, EventTypes.HOLD_EXPIRED))
+                                        .thenReturn(true);
 
-            // when
-            holdExpiredConsumer.accept(message);
+                        Mockito.lenient().when(objectMapper.readValue(payload, HoldExpiredEvent.class))
+                                        .thenReturn(event);
 
-            // then
-            verify(holdEventService, never()).processHoldExpired(event);
+                        // when
+                        holdExpiredConsumer.accept(message);
+
+                        // then
+                        verify(holdEventService, times(1)).processHoldExpired(event);
+                }
         }
-    }
 
-    @Test
-    void shouldProcessValidHoldVoidedEvent() throws Exception {
-        // given
-        String payload = "{\"transactionId\":123,\"holdId\":456}";
+        @ParameterizedTest
+        @ValueSource(strings = { EventTypes.TRANSACTION_AUTHORIZED, EventTypes.HOLD_CREATED, EventTypes.HOLD_VOIDED,
+                        EventTypes.TRANSACTION_FAILED, EventTypes.TRANSACTION_INITIATED,
+                        EventTypes.TRANSACTION_POSTED })
+        void shouldNotProcessInvalidHoldExpiredEvent(String eventType) throws Exception {
+                // given
+                String payload = "{\"transactionId\":123,\"holdId\":456}";
 
-        Message<String> message = MessageBuilder
-                .withPayload(payload)
-                .setHeader("eventType", EventTypes.HOLD_VOIDED)
-                .build();
+                Message<String> message = MessageBuilder
+                                .withPayload(payload)
+                                .setHeader("eventType", eventType)
+                                .build();
 
-        HoldVoidedEvent event = new HoldVoidedEvent();
-        event.setTransactionId(123L);
-        event.setHoldId(456L);
+                HoldExpiredEvent event = new HoldExpiredEvent();
+                event.setTransactionId(123L);
+                event.setHoldId(456L);
 
-        try (MockedStatic<EventValidationUtils> mockedUtils = Mockito.mockStatic(EventValidationUtils.class)) {
-            mockedUtils.when(() -> EventValidationUtils.validateEventType(message, EventTypes.HOLD_VOIDED))
-                    .thenReturn(true);
+                try (MockedStatic<EventValidationUtils> mockedUtils = Mockito.mockStatic(EventValidationUtils.class)) {
+                        mockedUtils.when(() -> EventValidationUtils.validateEventType(message, EventTypes.HOLD_EXPIRED))
+                                        .thenReturn(false);
 
-            Mockito.lenient().when(objectMapper.readValue(payload, HoldVoidedEvent.class)).thenReturn(event);
+                        // when
+                        holdExpiredConsumer.accept(message);
 
-            // when
-            holdVoidedConsumer.accept(message);
-
-            // then
-            verify(holdEventService, times(1)).processHoldVoided(event);
+                        // then
+                        verify(holdEventService, never()).processHoldExpired(event);
+                }
         }
-    }
 
-    @ParameterizedTest
-    @ValueSource(strings = { EventTypes.TRANSACTION_AUTHORIZED, EventTypes.HOLD_CREATED, EventTypes.HOLD_EXPIRED,
-            EventTypes.TRANSACTION_FAILED, EventTypes.TRANSACTION_INITIATED, EventTypes.TRANSACTION_POSTED })
-    void shouldNotProcessInvalidHoldVoidedEvent(String eventType) throws Exception {
-        // given
-        String payload = "{\"transactionId\":123,\"holdId\":456}";
+        @Test
+        void shouldProcessValidHoldVoidedEvent() throws Exception {
+                // given
+                String payload = "{\"transactionId\":123,\"holdId\":456}";
 
-        Message<String> message = MessageBuilder
-                .withPayload(payload)
-                .setHeader("eventType", eventType)
-                .build();
+                Message<String> message = MessageBuilder
+                                .withPayload(payload)
+                                .setHeader("eventType", EventTypes.HOLD_VOIDED)
+                                .build();
 
-        HoldVoidedEvent event = new HoldVoidedEvent();
-        event.setTransactionId(123L);
-        event.setHoldId(456L);
+                HoldVoidedEvent event = new HoldVoidedEvent();
+                event.setTransactionId(123L);
+                event.setHoldId(456L);
 
-        try (MockedStatic<EventValidationUtils> mockedUtils = Mockito.mockStatic(EventValidationUtils.class)) {
-            mockedUtils.when(() -> EventValidationUtils.validateEventType(message, EventTypes.HOLD_VOIDED))
-                    .thenReturn(false);
+                try (MockedStatic<EventValidationUtils> mockedUtils = Mockito.mockStatic(EventValidationUtils.class)) {
+                        mockedUtils.when(() -> EventValidationUtils.validateEventType(message, EventTypes.HOLD_VOIDED))
+                                        .thenReturn(true);
 
-            // when
-            holdVoidedConsumer.accept(message);
+                        Mockito.lenient().when(objectMapper.readValue(payload, HoldVoidedEvent.class))
+                                        .thenReturn(event);
 
-            // then
-            verify(holdEventService, never()).processHoldVoided(event);
+                        // when
+                        holdVoidedConsumer.accept(message);
+
+                        // then
+                        verify(holdEventService, times(1)).processHoldVoided(event);
+                }
         }
-    }
+
+        @ParameterizedTest
+        @ValueSource(strings = { EventTypes.TRANSACTION_AUTHORIZED, EventTypes.HOLD_CREATED, EventTypes.HOLD_EXPIRED,
+                        EventTypes.TRANSACTION_FAILED, EventTypes.TRANSACTION_INITIATED,
+                        EventTypes.TRANSACTION_POSTED })
+        void shouldNotProcessInvalidHoldVoidedEvent(String eventType) throws Exception {
+                // given
+                String payload = "{\"transactionId\":123,\"holdId\":456}";
+
+                Message<String> message = MessageBuilder
+                                .withPayload(payload)
+                                .setHeader("eventType", eventType)
+                                .build();
+
+                HoldVoidedEvent event = new HoldVoidedEvent();
+                event.setTransactionId(123L);
+                event.setHoldId(456L);
+
+                try (MockedStatic<EventValidationUtils> mockedUtils = Mockito.mockStatic(EventValidationUtils.class)) {
+                        mockedUtils.when(() -> EventValidationUtils.validateEventType(message, EventTypes.HOLD_VOIDED))
+                                        .thenReturn(false);
+
+                        // when
+                        holdVoidedConsumer.accept(message);
+
+                        // then
+                        verify(holdEventService, never()).processHoldVoided(event);
+                }
+        }
 }

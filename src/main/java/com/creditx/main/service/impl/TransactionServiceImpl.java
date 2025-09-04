@@ -29,6 +29,7 @@ import com.creditx.main.repository.TransactionRepository;
 import com.creditx.main.repository.TransactionEntryRepository;
 import com.creditx.main.service.OutboxEventService;
 import com.creditx.main.service.TransactionService;
+import com.creditx.main.tracing.TransactionSpanTagger;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,7 @@ public class TransactionServiceImpl implements TransactionService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final TransactionEntryRepository transactionEntryRepository;
+    private final TransactionSpanTagger transactionSpanTagger;
 
     @Value("${app.credithold.url:http://localhost:8081}")
     private String creditHoldServiceUrl;
@@ -73,7 +75,9 @@ public class TransactionServiceImpl implements TransactionService {
                 .amount(request.getAmount())
                 .currency(request.getCurrency())
                 .build();
-        txn = transactionRepository.save(txn);
+    txn = transactionRepository.save(txn);
+    // Tag the current span with the new transactionId for trace correlation
+    transactionSpanTagger.tagTransactionId(txn.getTransactionId());
 
         // Outbox event payload
         recordInitiatedEvent(txn, issuer, merchant, request.getAmount(), request.getCurrency());
@@ -109,9 +113,11 @@ public class TransactionServiceImpl implements TransactionService {
     @Override
     @Transactional
     public CommitTransactionResponse commitTransaction(Long transactionId, CommitTransactionRequest request) {
-        // Find transaction by ID and holdId for idempotency
+    // Find transaction by ID and holdId for idempotency
         Transaction transaction = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new IllegalArgumentException("Transaction not found"));
+    // Ensure span (if present) is tagged even on follow-up operations
+    transactionSpanTagger.tagTransactionId(transaction.getTransactionId());
         
         // Validate transaction is in AUTHORIZED state
         if (!TransactionStatus.AUTHORIZED.equals(transaction.getStatus())) {
