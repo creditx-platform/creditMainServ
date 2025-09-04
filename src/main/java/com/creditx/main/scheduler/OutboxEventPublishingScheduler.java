@@ -27,21 +27,11 @@ public class OutboxEventPublishingScheduler {
 
         for (OutboxEvent event : events) {
             try {
-                // Publish transaction events to Kafka for other services to consume
-                // These events help maintain consistency across the distributed system
-                if (isPublishableEvent(event.getEventType())) {
-                    outboxStreamPublisher.publish(event.getAggregateId().toString(), event.getPayload());
-                }
+                outboxStreamPublisher.publish(event.getAggregateId().toString(), event.getPayload());
                 outboxEventService.markAsPublished(event);
             } catch (Exception e) {
                 outboxEventService.markAsFailed(event);
             }
         }
-    }
-    
-    private boolean isPublishableEvent(String eventType) {
-        return "transaction.authorized".equals(eventType) || 
-               "transaction.posted".equals(eventType) || 
-               "transaction.failed".equals(eventType);
     }
 }

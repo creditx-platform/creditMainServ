@@ -1,131 +1,234 @@
 package com.creditx.main.util;
 
-import com.creditx.main.constants.EventTypes;
-import org.junit.jupiter.api.Test;
-import org.springframework.messaging.Message;
-import org.springframework.messaging.MessageHeaders;
-import org.springframework.messaging.support.GenericMessage;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
+import org.springframework.integration.support.MessageBuilder;
+import org.springframework.messaging.Message;
+
+import com.creditx.main.constants.EventTypes;
 
 class EventValidationUtilsTest {
 
-    @Test
-    void validateEventType_shouldReturnTrueWhenEventTypeMatches() {
-        // Given: Message with correct event type header
-        Map<String, Object> headers = new HashMap<>();
-        headers.put(EventTypes.EVENT_TYPE_HEADER, EventTypes.HOLD_CREATED);
-        Message<String> message = new GenericMessage<>("test payload", new MessageHeaders(headers));
+	@Test
+	void shouldValidateCorrectEventType() {
+		// given
+		String payload = "{\"transactionId\":123}";
+		Message<String> message = MessageBuilder
+				.withPayload(payload)
+				.setHeader(EventTypes.EVENT_TYPE_HEADER, EventTypes.TRANSACTION_AUTHORIZED)
+				.build();
 
-        // When: Validating event type
-        boolean result = EventValidationUtils.validateEventType(message, EventTypes.HOLD_CREATED);
+		// when
+		boolean result = EventValidationUtils.validateEventType(message, EventTypes.TRANSACTION_AUTHORIZED);
 
-        // Then: Validation should pass
-        assertThat(result).isTrue();
-    }
+		// then
+		assertThat(result).isTrue();
+	}
 
-    @Test
-    void validateEventType_shouldReturnFalseWhenEventTypeMismatch() {
-        // Given: Message with different event type header
-        Map<String, Object> headers = new HashMap<>();
-        headers.put(EventTypes.EVENT_TYPE_HEADER, EventTypes.HOLD_CREATED);
-        Message<String> message = new GenericMessage<>("test payload", new MessageHeaders(headers));
+	@Test
+	void shouldNotValidateIncorrectEventType() {
+		// given
+		String payload = "{\"transactionId\":123}";
+		Message<String> message = MessageBuilder
+				.withPayload(payload)
+				.setHeader(EventTypes.EVENT_TYPE_HEADER, EventTypes.HOLD_CREATED)
+				.build();
 
-        // When: Validating against different event type
-        boolean result = EventValidationUtils.validateEventType(message, EventTypes.HOLD_EXPIRED);
+		// when
+		boolean result = EventValidationUtils.validateEventType(message, EventTypes.TRANSACTION_AUTHORIZED);
 
-        // Then: Validation should fail
-        assertThat(result).isFalse();
-    }
+		// then
+		assertThat(result).isFalse();
+	}
 
-    @Test
-    void validateEventType_shouldReturnFalseWhenEventTypeHeaderMissing() {
-        // Given: Message without event type header
-        Map<String, Object> headers = new HashMap<>();
-        headers.put("X-Trace-Id", "test-trace-id");
-        Message<String> message = new GenericMessage<>("test payload", new MessageHeaders(headers));
+	@Test
+	void shouldNotValidateWhenEventTypeHeaderMissing() {
+		// given
+		String payload = "{\"transactionId\":123}";
+		Message<String> message = MessageBuilder
+				.withPayload(payload)
+				.build(); // No event type header
 
-        // When: Validating event type
-        boolean result = EventValidationUtils.validateEventType(message, EventTypes.HOLD_CREATED);
+		// when
+		boolean result = EventValidationUtils.validateEventType(message, EventTypes.TRANSACTION_AUTHORIZED);
 
-        // Then: Validation should fail
-        assertThat(result).isFalse();
-    }
+		// then
+		assertThat(result).isFalse();
+	}
 
-    @Test
-    void validateEventType_shouldReturnFalseWhenMessageIsNull() {
-        // When: Validating null message
-        boolean result = EventValidationUtils.validateEventType(null, EventTypes.HOLD_CREATED);
+	@Test
+	void shouldNotValidateNullMessage() {
+		// given
+		Message<String> nullMessage = null;
 
-        // Then: Validation should fail
-        assertThat(result).isFalse();
-    }
+		// when
+		boolean result = EventValidationUtils.validateEventType(nullMessage, EventTypes.TRANSACTION_AUTHORIZED);
 
-    @Test
-    void validateEventType_shouldReturnFalseWhenExpectedEventTypeIsNull() {
-        // Given: Valid message
-        Map<String, Object> headers = new HashMap<>();
-        headers.put(EventTypes.EVENT_TYPE_HEADER, EventTypes.HOLD_CREATED);
-        Message<String> message = new GenericMessage<>("test payload", new MessageHeaders(headers));
+		// then
+		assertThat(result).isFalse();
+	}
 
-        // When: Validating against null expected event type
-        boolean result = EventValidationUtils.validateEventType(message, null);
+	@Test
+	void shouldNotValidateNullExpectedEventType() {
+		// given
+		String payload = "{\"transactionId\":123}";
+		Message<String> message = MessageBuilder
+				.withPayload(payload)
+				.setHeader(EventTypes.EVENT_TYPE_HEADER, EventTypes.TRANSACTION_AUTHORIZED)
+				.build();
 
-        // Then: Validation should fail
-        assertThat(result).isFalse();
-    }
+		// when
+		boolean result = EventValidationUtils.validateEventType(message, null);
 
-    @Test
-    void validateEventType_shouldReturnFalseWhenExpectedEventTypeIsEmpty() {
-        // Given: Valid message
-        Map<String, Object> headers = new HashMap<>();
-        headers.put(EventTypes.EVENT_TYPE_HEADER, EventTypes.HOLD_CREATED);
-        Message<String> message = new GenericMessage<>("test payload", new MessageHeaders(headers));
+		// then
+		assertThat(result).isFalse();
+	}
 
-        // When: Validating against empty expected event type
-        boolean result = EventValidationUtils.validateEventType(message, "");
+	@Test
+	void shouldNotValidateEmptyExpectedEventType() {
+		// given
+		String payload = "{\"transactionId\":123}";
+		Message<String> message = MessageBuilder
+				.withPayload(payload)
+				.setHeader(EventTypes.EVENT_TYPE_HEADER, EventTypes.TRANSACTION_AUTHORIZED)
+				.build();
 
-        // Then: Validation should fail
-        assertThat(result).isFalse();
-    }
+		// when
+		boolean result = EventValidationUtils.validateEventType(message, "");
 
-    @Test
-    void getEventType_shouldReturnEventTypeWhenPresent() {
-        // Given: Message with event type header
-        Map<String, Object> headers = new HashMap<>();
-        headers.put(EventTypes.EVENT_TYPE_HEADER, EventTypes.TRANSACTION_AUTHORIZED);
-        Message<String> message = new GenericMessage<>("test payload", new MessageHeaders(headers));
+		// then
+		assertThat(result).isFalse();
+	}
 
-        // When: Getting event type
-        String eventType = EventValidationUtils.getEventType(message);
+	@Test
+	void shouldNotValidateWhitespaceExpectedEventType() {
+		// given
+		String payload = "{\"transactionId\":123}";
+		Message<String> message = MessageBuilder
+				.withPayload(payload)
+				.setHeader(EventTypes.EVENT_TYPE_HEADER, EventTypes.TRANSACTION_AUTHORIZED)
+				.build();
 
-        // Then: Should return correct event type
-        assertThat(eventType).isEqualTo(EventTypes.TRANSACTION_AUTHORIZED);
-    }
+		// when
+		boolean result = EventValidationUtils.validateEventType(message, "   ");
 
-    @Test
-    void getEventType_shouldReturnNullWhenEventTypeHeaderMissing() {
-        // Given: Message without event type header
-        Map<String, Object> headers = new HashMap<>();
-        headers.put("X-Trace-Id", "test-trace-id");
-        Message<String> message = new GenericMessage<>("test payload", new MessageHeaders(headers));
+		// then
+		assertThat(result).isFalse();
+	}
 
-        // When: Getting event type
-        String eventType = EventValidationUtils.getEventType(message);
+	@Test
+	void shouldValidateWithCustomEventTypeHeader() {
+		// given
+		String payload = "{\"holdId\":456}";
+		Map<String, Object> headers = new HashMap<>();
+		headers.put(EventTypes.EVENT_TYPE_HEADER, "custom.event.type");
+        
+		Message<String> message = MessageBuilder
+				.withPayload(payload)
+				.copyHeaders(headers)
+				.build();
 
-        // Then: Should return null
-        assertThat(eventType).isNull();
-    }
+		// when
+		boolean result = EventValidationUtils.validateEventType(message, "custom.event.type");
 
-    @Test
-    void getEventType_shouldReturnNullWhenMessageIsNull() {
-        // When: Getting event type from null message
-        String eventType = EventValidationUtils.getEventType(null);
+		// then
+		assertThat(result).isTrue();
+	}
 
-        // Then: Should return null
-        assertThat(eventType).isNull();
-    }
+	@Test
+	void shouldGetEventTypeFromMessage() {
+		// given
+		String payload = "{\"transactionId\":123}";
+		Message<String> message = MessageBuilder
+				.withPayload(payload)
+				.setHeader(EventTypes.EVENT_TYPE_HEADER, EventTypes.HOLD_EXPIRED)
+				.build();
+
+		// when
+		String eventType = EventValidationUtils.getEventType(message);
+
+		// then
+		assertThat(eventType).isEqualTo(EventTypes.HOLD_EXPIRED);
+	}
+
+	@Test
+	void shouldReturnNullWhenEventTypeHeaderMissing() {
+		// given
+		String payload = "{\"transactionId\":123}";
+		Message<String> message = MessageBuilder
+				.withPayload(payload)
+				.build(); // No event type header
+
+		// when
+		String eventType = EventValidationUtils.getEventType(message);
+
+		// then
+		assertThat(eventType).isNull();
+	}
+
+	@Test
+	void shouldReturnNullForNullMessage() {
+		// given
+		Message<String> nullMessage = null;
+
+		// when
+		String eventType = EventValidationUtils.getEventType(nullMessage);
+
+		// then
+		assertThat(eventType).isNull();
+	}
+
+	@Test
+	void shouldHandleNonStringEventTypeHeader() {
+		// given
+		String payload = "{\"transactionId\":123}";
+		Map<String, Object> headers = new HashMap<>();
+		headers.put(EventTypes.EVENT_TYPE_HEADER, 12345); // Non-string value
+        
+		Message<String> message = MessageBuilder
+				.withPayload(payload)
+				.copyHeaders(headers)
+				.build();
+
+		// when
+		String eventType = EventValidationUtils.getEventType(message);
+		boolean isValid = EventValidationUtils.validateEventType(message, "12345");
+
+		// then
+		assertThat(eventType).isEqualTo("12345"); // Should convert to string
+		assertThat(isValid).isTrue(); // Should validate correctly
+	}
+
+	@Test
+	void shouldValidateAllEventTypes() {
+		// Test validation for all defined event types
+		String[] allEventTypes = {
+			EventTypes.TRANSACTION_AUTHORIZED,
+			EventTypes.TRANSACTION_INITIATED,
+			EventTypes.TRANSACTION_POSTED,
+			EventTypes.TRANSACTION_FAILED,
+			EventTypes.HOLD_CREATED,
+			EventTypes.HOLD_EXPIRED,
+			EventTypes.HOLD_VOIDED
+		};
+
+		for (String eventType : allEventTypes) {
+			// given
+			String payload = "{\"test\":\"data\"}";
+			Message<String> message = MessageBuilder
+					.withPayload(payload)
+					.setHeader(EventTypes.EVENT_TYPE_HEADER, eventType)
+					.build();
+
+			// when
+			boolean result = EventValidationUtils.validateEventType(message, eventType);
+
+			// then
+			assertThat(result).as("Event type %s should be valid", eventType).isTrue();
+		}
+	}
 }
