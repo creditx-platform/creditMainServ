@@ -58,8 +58,8 @@ class OutboxEventPublishingSchedulerTest {
         outboxEventPublishingScheduler.publishPendingEvents();
 
         // then
-        verify(outboxStreamPublisher, times(1)).publish(String.valueOf(aggregateId1.getMostSignificantBits()), "{\"transactionId\":123}");
-        verify(outboxStreamPublisher, times(1)).publish(String.valueOf(aggregateId2.getMostSignificantBits()), "{\"transactionId\":456}");
+        verify(outboxStreamPublisher, times(1)).publish(String.valueOf(aggregateId1.getMostSignificantBits()), "{\"transactionId\":123}", "transaction.initiated");
+        verify(outboxStreamPublisher, times(1)).publish(String.valueOf(aggregateId2.getMostSignificantBits()), "{\"transactionId\":456}", "transaction.initiated");
         verify(outboxEventService, times(1)).markAsPublished(event1);
         verify(outboxEventService, times(1)).markAsPublished(event2);
     }
@@ -73,7 +73,7 @@ class OutboxEventPublishingSchedulerTest {
         outboxEventPublishingScheduler.publishPendingEvents();
 
         // then
-        verify(outboxStreamPublisher, never()).publish(any(), any());
+        verify(outboxStreamPublisher, never()).publish(any(), any(), any());
         verify(outboxEventService, never()).markAsPublished(any());
         verify(outboxEventService, never()).markAsFailed(any());
     }
@@ -86,13 +86,13 @@ class OutboxEventPublishingSchedulerTest {
 
         when(outboxEventService.fetchPendingEvents(10)).thenReturn(Arrays.asList(event));
         doThrow(new RuntimeException("Publishing failed")).when(outboxStreamPublisher)
-                .publish(String.valueOf(aggregateId.getMostSignificantBits()), "{\"transactionId\":123}");
+                .publish(String.valueOf(aggregateId.getMostSignificantBits()), "{\"transactionId\":123}", "transaction.initiated");
 
         // when
         outboxEventPublishingScheduler.publishPendingEvents();
 
         // then
-        verify(outboxStreamPublisher, times(1)).publish(String.valueOf(aggregateId.getMostSignificantBits()), "{\"transactionId\":123}");
+        verify(outboxStreamPublisher, times(1)).publish(String.valueOf(aggregateId.getMostSignificantBits()), "{\"transactionId\":123}", "transaction.initiated");
         verify(outboxEventService, never()).markAsPublished(event);
         verify(outboxEventService, times(1)).markAsFailed(event);
     }
@@ -101,6 +101,7 @@ class OutboxEventPublishingSchedulerTest {
         OutboxEvent event = new OutboxEvent();
         event.setAggregateId(aggregateId.getMostSignificantBits());
         event.setPayload(payload);
+        event.setEventType("transaction.initiated");
         return event;
     }
 }

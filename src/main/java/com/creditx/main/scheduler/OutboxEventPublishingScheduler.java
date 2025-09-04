@@ -40,7 +40,7 @@ public class OutboxEventPublishingScheduler {
         for (OutboxEvent event : events) {
             try {
                 log.debug("Publishing event {} of type {}", event.getEventId(), event.getEventType());
-                outboxStreamPublisher.publish(event.getAggregateId().toString(), event.getPayload());
+                outboxStreamPublisher.publish(event.getAggregateId().toString(), event.getPayload(), event.getEventType());
                 outboxEventService.markAsPublished(event);
                 successCount++;
                 log.debug("Successfully published event {}", event.getEventId());

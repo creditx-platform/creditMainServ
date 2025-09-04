@@ -37,14 +37,16 @@ class OutboxStreamPublisherTest {
         // given
         String key = "test-key";
         String payload = "{\"name\":\"test-payload\", \"value\":100}";
+        String eventType = "test.event";
         ArgumentCaptor<Message<String>> messageCaptor = ArgumentCaptor.forClass(Message.class);
         // when
-        outboxStreamPublisher.publish(key, payload);
+        outboxStreamPublisher.publish(key, payload, eventType);
         // then
         verify(streamBridge, times(1)).send(eq("test-binding"), messageCaptor.capture());
         Message<String> sentMessage = messageCaptor.getValue();
         assertThat(sentMessage.getPayload()).isEqualTo(payload);
         assertThat(sentMessage.getHeaders().get("key")).isEqualTo(key);
+        assertThat(sentMessage.getHeaders().get("eventType")).isEqualTo(eventType);
     }
 
     @Test
@@ -52,9 +54,10 @@ class OutboxStreamPublisherTest {
         // given
         String key = null;
         String payload = "{\"name\":\"test-payload\", \"value\":100}";
+        String eventType = "test.event";
         ArgumentCaptor<Message<String>> messageCaptor = ArgumentCaptor.forClass(Message.class);
         // when
-        outboxStreamPublisher.publish(key, payload);
+        outboxStreamPublisher.publish(key, payload, eventType);
         // then
         verify(streamBridge, never()).send(anyString(), anyString());
     }
@@ -64,9 +67,23 @@ class OutboxStreamPublisherTest {
         // given
         String key = "test-key";
         String payload = "";
+        String eventType = "test.event";
         ArgumentCaptor<Message<String>> messageCaptor = ArgumentCaptor.forClass(Message.class);
         // when
-        outboxStreamPublisher.publish(key, payload);
+        outboxStreamPublisher.publish(key, payload, eventType);
+        // then
+        verify(streamBridge, never()).send(anyString(), anyString());
+    }
+
+    @Test
+    void shouldNotPublishWithoutEventType() {
+        // given
+        String key = "test-key";
+        String payload = "{\"name\":\"test-payload\", \"value\":100}";
+        String eventType = null;
+        ArgumentCaptor<Message<String>> messageCaptor = ArgumentCaptor.forClass(Message.class);
+        // when
+        outboxStreamPublisher.publish(key, payload, eventType);
         // then
         verify(streamBridge, never()).send(anyString(), anyString());
     }
