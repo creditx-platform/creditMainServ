@@ -202,7 +202,7 @@ public class TransactionServiceImpl implements TransactionService {
         HttpEntity<CreateHoldRequest> entity = new HttpEntity<>(holdRequest, headers);
 
         try {
-            String url = creditHoldServiceUrl + "/holds";
+            String url = creditHoldServiceUrl + "/api/holds";
             log.info("Making POST request to URL: {}", url);
             var response = restTemplate.postForEntity(url, entity, CreateHoldResponse.class);
             log.info("Response status: {}", response.getStatusCode());
