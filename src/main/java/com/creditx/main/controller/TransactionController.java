@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestController
@@ -27,6 +28,7 @@ public class TransactionController {
     private final TransactionService transactionService;
 
     @PostMapping
+    @Operation(summary = "Create a transaction", description = "Creates a new inbound transaction", tags = {"public"})
     public ResponseEntity<CreateTransactionResponse> createTransaction(@Validated @RequestBody CreateTransactionRequest request) {
         log.info("=== CONTROLLER: Creating transaction for issuer: {}, merchant: {}, amount: {}", 
                 request.getIssuerAccountId(), request.getMerchantAccountId(), request.getAmount());
@@ -37,6 +39,7 @@ public class TransactionController {
     }
 
     @PostMapping("/{id}/commit")
+    @Operation(summary = "Commit a transaction", description = "Commits a previously created transaction", tags = {"internal"})
     public ResponseEntity<CommitTransactionResponse> commitTransaction(
             @PathVariable Long id, 
             @Validated @RequestBody CommitTransactionRequest request) {

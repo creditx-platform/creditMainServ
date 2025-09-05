@@ -19,6 +19,11 @@
             "name": "app.credithold.url",
             "type": "java.lang.String",
             "description": "URL of hold service"
+        },
+        {
+            "name": "api.doc.show-internal",
+            "type": "java.lang.String",
+            "description": "Should show internal api doc?"
         }
     ]
 }
