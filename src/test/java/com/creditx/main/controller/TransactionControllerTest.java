@@ -373,4 +373,45 @@ class TransactionControllerTest {
                 .andExpect(jsonPath("$.transactionId").value(999))
                 .andExpect(jsonPath("$.status").value("PENDING"));
     }
+
+    @Test
+    void createCashbackTransaction_success() throws Exception {
+        given(transactionService.createCashbackTransaction(any())).willReturn(
+                CreateTransactionResponse.builder()
+                        .transactionId(555L)
+                        .status(TransactionStatus.SUCCESS)
+                        .build());
+
+        String requestBody = """
+            {
+                "issuerAccountId": 2,
+                "merchantAccountId": 1,
+                "amount": 5.50,
+                "currency": "USD"
+            }
+            """;
+
+        mockMvc.perform(post("/api/transactions/cashback")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.transactionId").value(555))
+                .andExpect(jsonPath("$.status").value("SUCCESS"));
+    }
+
+    @Test
+    void createCashbackTransaction_validationError_missingAmount() throws Exception {
+        String requestBody = """
+            {
+                "issuerAccountId": 2,
+                "merchantAccountId": 1,
+                "currency": "USD"
+            }
+            """;
+
+        mockMvc.perform(post("/api/transactions/cashback")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody))
+                .andExpect(status().isBadRequest());
+    }
 }

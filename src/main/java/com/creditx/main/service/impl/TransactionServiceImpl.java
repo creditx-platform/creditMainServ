@@ -12,10 +12,12 @@ import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.creditx.main.dto.CreateHoldRequest;
 import com.creditx.main.dto.CreateHoldResponse;
 import com.creditx.main.dto.CreateTransactionRequest;
 import com.creditx.main.dto.CreateTransactionResponse;
+import com.creditx.main.dto.CreateCashbackTransactionRequest;
 import com.creditx.main.dto.CommitTransactionRequest;
 import com.creditx.main.dto.CommitTransactionResponse;
 import com.creditx.main.model.Account;
@@ -32,6 +34,7 @@ import com.creditx.main.service.OutboxEventService;
 import com.creditx.main.service.TransactionService;
 import com.creditx.main.tracing.TransactionSpanTagger;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +49,11 @@ public class TransactionServiceImpl implements TransactionService {
     private final OutboxEventService outboxEventService;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @PostConstruct
+    public void configureObjectMapper() {
+        objectMapper.registerModule(new JavaTimeModule());
+    }
     private final TransactionEntryRepository transactionEntryRepository;
     private final TransactionSpanTagger transactionSpanTagger;
 
@@ -109,6 +117,63 @@ public class TransactionServiceImpl implements TransactionService {
                 .transactionId(txn.getTransactionId())
                 .status(txn.getStatus())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public CreateTransactionResponse createCashbackTransaction(CreateCashbackTransactionRequest request) {
+    // Fetch accounts (issuer credited, merchant debited)
+    Account issuer = accountRepository.findById(request.getIssuerAccountId())
+        .orElseThrow(() -> new IllegalArgumentException("Issuer account not found"));
+    Account merchant = accountRepository.findById(request.getMerchantAccountId())
+        .orElseThrow(() -> new IllegalArgumentException("Merchant account not found"));
+
+    // Basic validation (skip hold flow for cashback)
+    if (!AccountStatus.ACTIVE.equals(issuer.getStatus()) || !AccountStatus.ACTIVE.equals(merchant.getStatus())) {
+        throw new IllegalArgumentException("Accounts must be ACTIVE");
+    }
+    if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+        throw new IllegalArgumentException("Amount must be positive");
+    }
+
+    Transaction txn = Transaction.builder()
+        .type(TransactionType.CASHBACK)
+        .status(TransactionStatus.SUCCESS)
+        .accountId(issuer.getAccountId())
+        .merchantId(merchant.getAccountId())
+        .amount(request.getAmount())
+        .currency(request.getCurrency())
+        .build();
+    txn = transactionRepository.save(txn);
+    transactionSpanTagger.tagTransactionId(txn.getTransactionId());
+
+    // Post double-entry (credit issuer, debit merchant)
+    issuer.setAvailableBalance(issuer.getAvailableBalance().add(request.getAmount()));
+    merchant.setAvailableBalance(merchant.getAvailableBalance().subtract(request.getAmount()));
+    accountRepository.save(issuer);
+    accountRepository.save(merchant);
+
+    // Entries
+    TransactionEntry merchantEntry = TransactionEntry.builder()
+        .transaction(txn)
+        .accountId(merchant.getAccountId())
+        .amount(request.getAmount().negate())
+        .build();
+    TransactionEntry issuerEntry = TransactionEntry.builder()
+        .transaction(txn)
+        .accountId(issuer.getAccountId())
+        .amount(request.getAmount())
+        .build();
+    transactionEntryRepository.save(merchantEntry);
+    transactionEntryRepository.save(issuerEntry);
+
+    // Outbox event (transaction.posted)
+    recordPostedEvent(txn, issuer, merchant);
+
+    return CreateTransactionResponse.builder()
+        .transactionId(txn.getTransactionId())
+        .status(txn.getStatus())
+        .build();
     }
 
     @Override

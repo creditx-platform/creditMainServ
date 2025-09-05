@@ -3,6 +3,7 @@ package com.creditx.main.controller;
 import com.creditx.main.dto.CommitTransactionRequest;
 import com.creditx.main.dto.CommitTransactionResponse;
 import com.creditx.main.dto.CreateTransactionRequest;
+import com.creditx.main.dto.CreateCashbackTransactionRequest;
 import com.creditx.main.dto.CreateTransactionResponse;
 import com.creditx.main.service.TransactionService;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,15 @@ public class TransactionController {
         log.info("=== CONTROLLER: Transaction created with ID: {}, status: {}", 
                 response.getTransactionId(), response.getStatus());
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+    }
+
+    @PostMapping("/cashback")
+    @Operation(summary = "Create a cashback transaction", description = "Internal endpoint to record a cashback credit", tags = {"internal"})
+    public ResponseEntity<CreateTransactionResponse> createCashback(@Validated @RequestBody CreateCashbackTransactionRequest request) {
+        log.info("=== CONTROLLER: Creating cashback transaction issuer={}, merchant={}, amount={}", request.getIssuerAccountId(), request.getMerchantAccountId(), request.getAmount());
+        var response = transactionService.createCashbackTransaction(request);
+        log.info("=== CONTROLLER: Cashback transaction created id={}, status={}", response.getTransactionId(), response.getStatus());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/{id}/commit")

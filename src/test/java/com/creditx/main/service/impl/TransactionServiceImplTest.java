@@ -225,6 +225,34 @@ class TransactionServiceImplTest {
         return transaction;
     }
 
+    @Test
+    void shouldCreateCashbackTransactionSuccessfully() {
+        // given
+        var request = new com.creditx.main.dto.CreateCashbackTransactionRequest();
+        request.setIssuerAccountId(1L);
+        request.setMerchantAccountId(2L);
+        request.setAmount(new BigDecimal("10.00"));
+        request.setCurrency("USD");
+
+        Account issuer = createIssuerAccount();
+        Account merchant = createMerchantAccount();
+        Transaction saved = createTransaction(10L, TransactionStatus.SUCCESS);
+        saved.setType(TransactionType.CASHBACK);
+
+        when(accountRepository.findById(1L)).thenReturn(Optional.of(issuer));
+        when(accountRepository.findById(2L)).thenReturn(Optional.of(merchant));
+        when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
+
+        // when
+        CreateTransactionResponse response = transactionService.createCashbackTransaction(request);
+
+        // then
+        assertThat(response.getTransactionId()).isEqualTo(10L);
+        assertThat(response.getStatus()).isEqualTo(TransactionStatus.SUCCESS);
+        verify(outboxEventService, times(1)).saveEvent(anyString(), eq(10L), anyString());
+        verify(transactionEntryRepository, times(2)).save(any());
+    }
+
     private CreateHoldResponse createHoldResponse(Long holdId, String status) {
         CreateHoldResponse response = new CreateHoldResponse();
         response.setHoldId(holdId);
