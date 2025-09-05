@@ -1,6 +1,7 @@
 package com.creditx.main.service.impl;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -270,8 +271,8 @@ public class TransactionServiceImpl implements TransactionService {
     }
     
     private void recordPostedEvent(Transaction transaction, Account issuer, Account merchant) {
-        var payload = new PostedPayload(transaction.getTransactionId(), issuer.getAccountId(), 
-                merchant.getAccountId(), transaction.getAmount(), transaction.getCurrency());
+        var payload = new PostedPayload(transaction.getTransactionId(), transaction.getType(), issuer.getAccountId(), 
+                merchant.getAccountId(), transaction.getAmount(), transaction.getCurrency(), transaction.getCreatedAt());
         try {
             outboxEventService.saveEvent("transaction.posted", transaction.getTransactionId(), 
                     objectMapper.writeValueAsString(payload));
@@ -282,5 +283,5 @@ public class TransactionServiceImpl implements TransactionService {
 
     // Simple record for JSON serialization
     private record InitiatedPayload(Long transactionId, Long issuerAccountId, Long merchantAccountId, BigDecimal amount, String currency) {}
-    private record PostedPayload(Long transactionId, Long issuerAccountId, Long merchantAccountId, BigDecimal amount, String currency) {}
+    private record PostedPayload(Long transactionId, TransactionType type, Long issuerAccountId, Long merchantAccountId, BigDecimal amount, String currency, Instant createdAt) {}
 }
