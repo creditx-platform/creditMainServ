@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateHoldResponse {
-    private Long holdId;
-    private HoldStatus status;
+
+  private Long holdId;
+  private HoldStatus status;
 }

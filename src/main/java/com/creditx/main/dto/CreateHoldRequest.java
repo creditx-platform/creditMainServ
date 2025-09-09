@@ -12,9 +12,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateHoldRequest {
-    private Long transactionId;
-    private Long issuerAccountId;
-    private Long merchantAccountId;
-    private BigDecimal amount;
-    private String currency;
+
+  private Long transactionId;
+  private Long issuerAccountId;
+  private Long merchantAccountId;
+  private BigDecimal amount;
+  private String currency;
 }

@@ -11,7 +11,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CommitTransactionRequest {
-    private Long transactionId; // Will be set from path variable
-    @NotNull
-    private Long holdId;
+
+  private Long transactionId; // Will be set from path variable
+  @NotNull
+  private Long holdId;
 }

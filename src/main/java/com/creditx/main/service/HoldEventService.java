@@ -5,7 +5,10 @@ import com.creditx.main.dto.HoldExpiredEvent;
 import com.creditx.main.dto.HoldVoidedEvent;
 
 public interface HoldEventService {
-    void processHoldCreated(HoldCreatedEvent event);
-    void processHoldExpired(HoldExpiredEvent event);
-    void processHoldVoided(HoldVoidedEvent event);
+
+  void processHoldCreated(HoldCreatedEvent event);
+
+  void processHoldExpired(HoldExpiredEvent event);
+
+  void processHoldVoided(HoldVoidedEvent event);
 }

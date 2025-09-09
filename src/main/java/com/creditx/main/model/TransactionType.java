@@ -1,8 +1,5 @@
 package com.creditx.main.model;
 
 public enum TransactionType {
-    INBOUND,
-    CAPTURE,
-    COMPENSATION,
-    CASHBACK
+  INBOUND, CAPTURE, COMPENSATION, CASHBACK
 }
